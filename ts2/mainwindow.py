@@ -608,8 +608,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.trainListPanel.setVisible(False)
                 self.serviceListPanel.setVisible(False)
                 
-                # Keep AI hints available in all views
-                self.ai_hints_dock.show()
+                # Hide AI hints in non-simulation views
+                self.ai_hints_dock.hide()
                 
                 print(f"Bottom panels hidden in {view_name} view")
             
