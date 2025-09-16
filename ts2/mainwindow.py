@@ -36,7 +36,7 @@ from ts2 import __PROJECT_WWW__, __PROJECT_HOME__, __PROJECT_BUGS__, \
 from ts2 import simulation
 from ts2.editor import editorwindow
 from ts2.gui import dialogs, trainlistview, servicelistview, widgets, \
-    opendialog, settingsdialog
+    opendialog, settingsdialog, sidebar, analytics_views, ai_hints, modern_header
 from ts2.scenery import placeitem
 from ts2.utils import settings
 
@@ -63,8 +63,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.setObjectName("ts2_main_window")
         self.editorWindow = None
-        self.setGeometry(100, 100, 800, 600)
-        self.setWindowTitle(self.tr("ts2 - Train Signalling Simulation - %s")
+        self.setGeometry(100, 100, 1200, 800)  # Larger window for new UI
+        self.setWindowTitle(self.tr("TrackTitans - Railway Operations Center - %s")
                             % __VERSION__)
 
         # Simulation
@@ -73,6 +73,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self.serverPID = None
         if settings.debug:
             websocket.enableTrace(True)
+            
+        # View management
+        self.current_view = "simulation"
+        self.views = {}
 
         # Actions  ======================================
         self.openAction = QtWidgets.QAction(self.tr("&Open..."), self)
@@ -185,89 +189,31 @@ class MainWindow(QtWidgets.QMainWindow):
         self.menuBar().setCursor(Qt.PointingHandCursor)
 
         # ==============================================================
-        # ToolBars
+        # Modern Header Widget (Perfect Layout)
 
-        # =========
-        # Actions
-        tbar, tbg = self._make_toolbar_group(self.tr("Simulation"),
-                                             bg="#dddddd")
-        self.addToolBar(tbar)
-        tbg.addAction(self.openAction)
-        tbg.addAction(self.editorCurrAction)
-
-        # =========
-        # Speed
-        tbar, tbg = self._make_toolbar_group(self.tr("Speed"), bg="#aaaaaa")
-        self.addToolBar(tbar)
-
-        # Time factor spinBox
-        self.timeFactorSpinBox = QtWidgets.QSpinBox(self)
-        self.timeFactorSpinBox.setRange(1, 10)
-        self.timeFactorSpinBox.setSingleStep(1)
-        self.timeFactorSpinBox.setValue(1)
-        self.timeFactorSpinBox.setSuffix("x")
-        tbg.addWidget(self.timeFactorSpinBox)
-
-        # =========
-        # Zoom
-        tbar, tbg = self._make_toolbar_group(self.tr("Zoom"), bg="white")
-        self.addToolBar(tbar)
-        tbg.setMaximumWidth(300)
-
-        self.zoomWidget = widgets.ZoomWidget(self)
-        self.zoomWidget.valueChanged.connect(self.zoom)
-        tbg.addWidget(self.zoomWidget)
-
-        # =========
-        # Score
-        tbar, tbg = self._make_toolbar_group(self.tr("Penalty"), bg="#dddddd")
-        self.addToolBar(tbar)
-
-        # Score display
-        self.scoreDisplay = QtWidgets.QLCDNumber(self)
-        self.scoreDisplay.setFrameShape(QtWidgets.QFrame.NoFrame)
-        self.scoreDisplay.setFrameShadow(QtWidgets.QFrame.Plain)
-        self.scoreDisplay.setSegmentStyle(QtWidgets.QLCDNumber.Flat)
-        self.scoreDisplay.setNumDigits(5)
-        self.scoreDisplay.setMinimumHeight(30)
-        tbg.addWidget(self.scoreDisplay)
-
-        # =========
-        # Clock
-        tbar, tbg = self._make_toolbar_group(self.tr("Clock"), fg="Yellow",
-                                             bg="#444444")
-        self.addToolBar(tbar)
-
-        # Pause button
-        self.buttPause = QtWidgets.QToolButton(self)
-        self.buttPause.setText(self.tr("Pause"))
-        self.buttPause.setCheckable(True)
-        self.buttPause.setAutoRaise(True)
-        self.buttPause.setMaximumWidth(50)
-        self.buttPause.setChecked(True)
-        tbg.addWidget(self.buttPause)
-
-        # Clock Widget
-        self.clockWidget = widgets.ClockWidget(self)
-        tbg.addWidget(self.clockWidget)
-
-        # ====================
-        # Sim Title
-        tbar = QtWidgets.QToolBar()
-        tbar.setObjectName("toolbar_label_title")
-        tbar.setFloatable(False)
-        tbar.setMovable(False)
-        self.addToolBar(tbar)
-
-        self.lblTitle = QtWidgets.QLabel()
-        lbl_sty = "background: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 0," \
-                  " stop: 0 #fefefe, stop: 1 #CECECE);"
-        lbl_sty += " color: #333333; font-size: 16pt; padding: 1px;"
-        self.lblTitle.setStyleSheet(lbl_sty)
-        self.lblTitle.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        self.lblTitle.setText("no sim loaded")
-        tbar.addWidget(self.lblTitle)
-        tbar.layout().setSizeConstraint(QtWidgets.QLayout.SetMaximumSize)
+        # Create modern header with proper layout management
+        self.modern_header = modern_header.ModernHeaderWidget(self)
+        
+        # Connect header signals
+        self.modern_header.openActionTriggered.connect(self.onOpenSimulation)
+        self.modern_header.editActionTriggered.connect(self.onEditorCurrent)
+        self.modern_header.speedChanged.connect(self.onSpeedChanged)
+        self.modern_header.zoomChanged.connect(self.zoom)
+        self.modern_header.pauseToggled.connect(self.onPauseToggled)
+        
+        # Add as a widget above the main container (not as toolbar)
+        self.header_container = QtWidgets.QWidget()
+        header_layout = QtWidgets.QVBoxLayout(self.header_container)
+        header_layout.setContentsMargins(0, 0, 0, 0)
+        header_layout.setSpacing(0)
+        header_layout.addWidget(self.modern_header)
+        
+        # Store references for compatibility
+        self.scoreDisplay = self.modern_header.score_display
+        self.clockWidget = self.modern_header.clock_widget
+        self.buttPause = self.modern_header.pause_btn
+        self.zoomWidget = self.modern_header.zoom_widget
+        self.lblTitle = self.modern_header.title_label
 
         # ===============================================================
         # Dock Widgets
@@ -281,6 +227,8 @@ class MainWindow(QtWidgets.QMainWindow):
             QtWidgets.QDockWidget.DockWidgetMovable |
             QtWidgets.QDockWidget.DockWidgetFloatable
         )
+        # Ensure dock widget cannot be closed accidentally
+        self.trainInfoPanel.setFeatures(self.trainInfoPanel.features() & ~QtWidgets.QDockWidget.DockWidgetClosable)
         self.trainInfoView = QtWidgets.QTreeView(self)
         self.trainInfoView.setItemsExpandable(False)
         self.trainInfoView.setRootIsDecorated(False)
@@ -300,6 +248,8 @@ class MainWindow(QtWidgets.QMainWindow):
             QtWidgets.QDockWidget.DockWidgetMovable |
             QtWidgets.QDockWidget.DockWidgetFloatable
         )
+        # Ensure dock widget cannot be closed accidentally
+        self.serviceInfoPanel.setFeatures(self.serviceInfoPanel.features() & ~QtWidgets.QDockWidget.DockWidgetClosable)
 
         sty = "background-color: #444444; color: white; padding: 2px;" \
               " font-size: 10pt"
@@ -337,6 +287,8 @@ class MainWindow(QtWidgets.QMainWindow):
             QtWidgets.QDockWidget.DockWidgetMovable |
             QtWidgets.QDockWidget.DockWidgetFloatable
         )
+        # Ensure dock widget cannot be closed accidentally
+        self.placeInfoPanel.setFeatures(self.placeInfoPanel.features() & ~QtWidgets.QDockWidget.DockWidgetClosable)
         wid = QtWidgets.QScrollArea()
         self.placeInfoPanel.setWidget(wid)
         hb = QtWidgets.QVBoxLayout()
@@ -364,6 +316,8 @@ class MainWindow(QtWidgets.QMainWindow):
             QtWidgets.QDockWidget.DockWidgetMovable |
             QtWidgets.QDockWidget.DockWidgetFloatable
         )
+        # Ensure dock widget cannot be closed accidentally
+        self.trainListPanel.setFeatures(self.trainListPanel.features() & ~QtWidgets.QDockWidget.DockWidgetClosable)
         self.trainListPanel.setObjectName("trains_panel")
         self.trainListView = trainlistview.TrainListView(self)
         self.simulationLoaded.connect(self.trainListView.setupTrainList)
@@ -376,6 +330,8 @@ class MainWindow(QtWidgets.QMainWindow):
             QtWidgets.QDockWidget.DockWidgetMovable |
             QtWidgets.QDockWidget.DockWidgetFloatable
         )
+        # Ensure dock widget cannot be closed accidentally
+        self.serviceListPanel.setFeatures(self.serviceListPanel.features() & ~QtWidgets.QDockWidget.DockWidgetClosable)
         self.serviceListPanel.setObjectName("services_panel")
         self.serviceListView = servicelistview.ServiceListView(self)
         self.simulationLoaded.connect(self.serviceListView.setupServiceList)
@@ -387,6 +343,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.loggerPanel = QtWidgets.QDockWidget(self.tr("Messages"), self)
         self.loggerPanel.setFeatures(QtWidgets.QDockWidget.DockWidgetMovable |
                                      QtWidgets.QDockWidget.DockWidgetFloatable)
+        # Ensure dock widget cannot be closed accidentally
+        self.loggerPanel.setFeatures(self.loggerPanel.features() & ~QtWidgets.QDockWidget.DockWidgetClosable)
         self.loggerPanel.setObjectName("logger_panel")
         self.loggerView = QtWidgets.QTreeView(self)
         self.loggerView.setItemsExpandable(False)
@@ -400,9 +358,47 @@ class MainWindow(QtWidgets.QMainWindow):
         self.addDockWidget(Qt.BottomDockWidgetArea, self.loggerPanel)
 
         # ===========================================
-        # Main Board
-        self.board = QtWidgets.QWidget(self)
-
+        # Main Application Layout with Header
+        
+        # Create main container with vertical layout (header on top)
+        main_container = QtWidgets.QWidget(self)
+        main_layout = QtWidgets.QVBoxLayout(main_container)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
+        
+        # Add header at the top
+        main_layout.addWidget(self.modern_header)
+        
+        # Content area below header (fixed layout for no cropping)
+        content_container = QtWidgets.QWidget()
+        content_layout = QtWidgets.QHBoxLayout(content_container)
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(0)
+        
+        # Sidebar Navigation (fixed width)
+        self.sidebar = sidebar.SidebarNavigation(self)
+        self.sidebar.viewChanged.connect(self.onViewChanged)
+        content_layout.addWidget(self.sidebar)
+        
+        # Create stacked widget for different views (expanding)
+        self.view_stack = QtWidgets.QStackedWidget()
+        self.view_stack.setMinimumWidth(800)  # Prevent cropping
+        self.view_stack.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+        content_layout.addWidget(self.view_stack)
+        
+        # Set layout proportions to prevent cropping
+        content_layout.setStretch(0, 0)  # Sidebar fixed
+        content_layout.setStretch(1, 1)  # View stack expands
+        
+        # Add content area to main layout
+        main_layout.addWidget(content_container)
+        
+        # Original simulation view (board)
+        self.board = QtWidgets.QWidget()
+        board_layout = QtWidgets.QVBoxLayout(self.board)
+        board_layout.setContentsMargins(0, 0, 0, 0)
+        board_layout.setSpacing(0)
+        
         # Canvas
         self.view = widgets.XGraphicsView(self.board)
         self.view.setInteractive(True)
@@ -410,14 +406,17 @@ class MainWindow(QtWidgets.QMainWindow):
         self.view.setDragMode(QtWidgets.QGraphicsView.ScrollHandDrag)
         self.view.setPalette(QtGui.QPalette(Qt.black))
         self.view.wheelChanged.connect(self.onWheelChanged)
-
-        # Display
-        self.grid = QtWidgets.QVBoxLayout()
-        self.grid.setContentsMargins(0, 0, 0, 0)
-        self.grid.addWidget(self.view)
-        self.grid.setSpacing(0)
-        self.board.setLayout(self.grid)
-        self.setCentralWidget(self.board)
+        
+        board_layout.addWidget(self.view)
+        
+        # Add simulation view to stack
+        self.view_stack.addWidget(self.board)
+        self.view_index_map = {"simulation": 0}
+        
+        # Create and add new views
+        self.setupNewViews()
+        
+        self.setCentralWidget(main_container)
 
         # Editor
         self.editorOpened = False
@@ -432,6 +431,109 @@ class MainWindow(QtWidgets.QMainWindow):
                 # else:
                 # here we call after window is shown
         QtCore.QTimer.singleShot(100, self.onAfterShow)
+        
+    def setupNewViews(self):
+        """Setup all the new view components"""
+        
+        # Map Overview
+        self.map_overview = sidebar.MapOverviewWidget(self)
+        self.map_overview.sectionSelected.connect(self.onSectionSelected)
+        self.view_stack.addWidget(self.map_overview)
+        self.view_index_map["map_overview"] = self.view_stack.count() - 1
+        self.views["map_overview"] = self.map_overview
+        
+        # Train Management
+        self.train_management = sidebar.TrainManagementWidget(self)
+        self.view_stack.addWidget(self.train_management)
+        self.view_index_map["train_management"] = self.view_stack.count() - 1
+        self.views["train_management"] = self.train_management
+        
+        # System Status
+        self.system_status = sidebar.SystemStatusWidget(self)
+        self.view_stack.addWidget(self.system_status)
+        self.view_index_map["system_status"] = self.view_stack.count() - 1
+        self.views["system_status"] = self.system_status
+        
+        # What-If Analysis
+        self.whatif_analysis = analytics_views.WhatIfAnalysisWidget(self)
+        self.view_stack.addWidget(self.whatif_analysis)
+        self.view_index_map["whatif_analysis"] = self.view_stack.count() - 1
+        self.views["whatif_analysis"] = self.whatif_analysis
+        
+        # KPI Dashboard - using the new comprehensive railway dashboard
+        self.kpi_dashboard = analytics_views.KPIDashboardWidget(self)
+        self.view_stack.addWidget(self.kpi_dashboard)
+        self.view_index_map["kpi_dashboard"] = self.view_stack.count() - 1
+        self.views["kpi_dashboard"] = self.kpi_dashboard
+        
+        # Audit Logs
+        self.audit_logs = analytics_views.AuditLogsWidget(self)
+        self.view_stack.addWidget(self.audit_logs)
+        self.view_index_map["audit_logs"] = self.view_stack.count() - 1
+        self.views["audit_logs"] = self.audit_logs
+        
+        # Settings view (placeholder)
+        settings_widget = QtWidgets.QWidget()
+        settings_layout = QtWidgets.QVBoxLayout(settings_widget)
+        settings_label = QtWidgets.QLabel("Settings")
+        settings_label.setAlignment(Qt.AlignCenter)
+        settings_label.setStyleSheet("font-size: 24px; color: #666666;")
+        settings_layout.addWidget(settings_label)
+        
+        self.view_stack.addWidget(settings_widget)
+        self.view_index_map["settings"] = self.view_stack.count() - 1
+        self.views["settings"] = settings_widget
+        
+        # Add AI Hints dock widget
+        self.ai_hints_dock = ai_hints.AIHintsDockWidget(self)
+        self.addDockWidget(Qt.RightDockWidgetArea, self.ai_hints_dock)
+        
+        # Set default view
+        self.view_stack.setCurrentIndex(0)  # Start with simulation view
+        
+        # Ensure simulation dock panels are visible initially
+        self.onViewChanged("simulation")
+        
+    @QtCore.pyqtSlot(str)
+    def onViewChanged(self, view_name):
+        """Handle view changes from sidebar navigation"""
+        if view_name in self.view_index_map:
+            self.view_stack.setCurrentIndex(self.view_index_map[view_name])
+            self.current_view = view_name
+            
+            # Show simulation panels only in simulation view
+            # Hide them in other views (editor, analytics, etc.)
+            if view_name == "simulation":
+                # Show all simulation-related panels
+                self.trainInfoPanel.show()
+                self.serviceInfoPanel.show() 
+                self.placeInfoPanel.show()
+                self.trainListPanel.show()
+                self.serviceListPanel.show()
+                self.loggerPanel.show()
+                self.ai_hints_dock.show()
+            else:
+                # Hide simulation panels for other views
+                self.trainInfoPanel.hide()
+                self.serviceInfoPanel.hide()
+                self.placeInfoPanel.hide() 
+                self.trainListPanel.hide()
+                self.serviceListPanel.hide()
+                self.loggerPanel.hide()
+                self.ai_hints_dock.hide()
+            
+    @QtCore.pyqtSlot(str)
+    def onSectionSelected(self, section_id):
+        """Handle section selection from map overview"""
+        # Switch to train management view and filter by section
+        self.view_stack.setCurrentIndex(self.view_index_map["train_management"])
+        self.current_view = "train_management"
+        
+        # In a real implementation, this would filter trains by section
+        QtWidgets.QMessageBox.information(
+            self, "Section Selected",
+            f"Section {section_id} selected. Train management view filtered accordingly."
+        )
 
     @staticmethod
     def instance():
@@ -508,9 +610,9 @@ class MainWindow(QtWidgets.QMainWindow):
         def load_sim(data):
             simData = json.dumps(data)
             self.simulation = simulation.load(self, io.StringIO(simData))
-            self.lblTitle.setText(self.simulation.option("title"))
+            # Title is now handled in simulationConnectSignals
             self.setWindowTitle(self.tr(
-                "ts2 - Train Signalling Simulator - %s") % self.simulation.option("title"))
+                "TrackTitans - Railway Operations - %s") % self.simulation.option("title"))
             self.simulationConnectSignals()
             self.webSocket.sendRequest("server", "renotify")
             self.simulationLoaded.emit(self.simulation)
@@ -521,6 +623,9 @@ class MainWindow(QtWidgets.QMainWindow):
             QtWidgets.QApplication.restoreOverrideCursor()
 
         self.webSocket.sendRequest("simulation", "dump", callback=load_sim)
+        
+        # Update sidebar connection status
+        self.sidebar.setConnectionStatus(True)
 
     def simulationConnectSignals(self):
         """Connects the signals and slots to the simulation."""
@@ -564,21 +669,17 @@ class MainWindow(QtWidgets.QMainWindow):
         self.simulation.messageLogger.rowsInserted.connect(
             self.loggerView.scrollToBottom
         )
-        # Panel
-        self.simulation.timeChanged.connect(self.clockWidget.setTime)
-        self.simulation.simulationPaused.connect(self.checkPauseButton)
-        self.simulation.scorer.scoreChanged.connect(
-            self.scoreDisplay.display
-        )
-        self.scoreDisplay.display(self.simulation.scorer.score)
-        self.simulation.timeFactorChanged.connect(self.timeFactorSpinBox.setValue)
-        self.buttPause.toggled.connect(self.simulation.pause)
-        self.timeFactorSpinBox.valueChanged.connect(
-            self.simulation.setTimeFactor
-        )
-        self.timeFactorSpinBox.setValue(
-            int(self.simulation.option("timeFactor"))
-        )
+        # Panel - Connect to modern header
+        self.simulation.timeChanged.connect(self.modern_header.setTime)
+        self.simulation.simulationPaused.connect(self.modern_header.setPauseState)
+        self.simulation.scorer.scoreChanged.connect(self.modern_header.setScore)
+        self.modern_header.setScore(self.simulation.scorer.score)
+        self.simulation.timeFactorChanged.connect(self.updateSpeedDisplay)
+        
+        # Set initial values in header
+        initial_speed = int(self.simulation.option("timeFactor"))
+        self.modern_header.setSpeed(initial_speed)
+        self.modern_header.setSimulationTitle(self.simulation.option("title"))
 
         # Menus
         self.saveGameAsAction.setEnabled(True)
@@ -646,12 +747,12 @@ class MainWindow(QtWidgets.QMainWindow):
             self.buttPause.toggled.disconnect()
         except TypeError:
             pass
-        try:
-            self.timeFactorSpinBox.valueChanged.disconnect()
-        except TypeError:
-            pass
-        self.timeFactorSpinBox.setValue(1)
-        self.buttPause.setChecked(True)
+        # Reset header controls
+        if hasattr(self, 'modern_header'):
+            self.modern_header.setSpeed(1)
+            self.modern_header.setScore(0) 
+            self.modern_header.setPauseState(True)
+            self.modern_header.setSimulationTitle(None)
 
         # Menus
         self.saveGameAsAction.setEnabled(False)
@@ -670,6 +771,9 @@ class MainWindow(QtWidgets.QMainWindow):
                 os.kill(self.serverPID, signal.SIGTERM)
                 self.serverPID = None
             self.setControlsDisabled(True)
+            
+        # Update sidebar connection status
+        self.sidebar.setConnectionStatus(False)
 
     @QtCore.pyqtSlot()
     def saveGame(self):
@@ -743,7 +847,26 @@ class MainWindow(QtWidgets.QMainWindow):
 
     @QtCore.pyqtSlot(bool)
     def checkPauseButton(self, paused):
-        self.buttPause.setChecked(paused)
+        """Update pause button state and text based on simulation state"""
+        if hasattr(self, 'modern_header'):
+            self.modern_header.setPauseState(paused)
+    
+    def updateSpeedDisplay(self, value):
+        """Update speed display when simulation speed changes"""
+        self.current_speed = value
+        if hasattr(self, 'modern_header'):
+            self.modern_header.setSpeed(value)
+    
+    # New header signal handlers
+    def onSpeedChanged(self, speed):
+        """Handle speed change from modern header"""
+        if hasattr(self, 'simulation') and self.simulation:
+            self.simulation.setTimeFactor(speed)
+            
+    def onPauseToggled(self, paused):
+        """Handle pause toggle from modern header"""
+        if hasattr(self, 'simulation') and self.simulation:
+            self.simulation.pause(paused)
 
     @QtCore.pyqtSlot()
     def openPropertiesDialog(self):
@@ -824,14 +947,16 @@ class MainWindow(QtWidgets.QMainWindow):
             self.lblPlaceInfoName.setText(place.name)
 
     def setControlsDisabled(self, state):
+        """Enable/disable header controls based on simulation state"""
+        # Enable/disable modern header controls
+        if hasattr(self, 'modern_header'):
+            self.modern_header.setControlsEnabled(not state)
+            
+        # Handle editor action separately
         if not state and self.fileName:
-            self.editorCurrAction.setDisabled(False)
+            self.modern_header.edit_btn.setEnabled(True)
         else:
-            self.editorCurrAction.setDisabled(True)
-        self.zoomWidget.setDisabled(state)
-        self.timeFactorSpinBox.setDisabled(state)
-        self.buttPause.setDisabled(state)
-        self.clockWidget.setDisabled(state)
+            self.modern_header.edit_btn.setEnabled(False)
 
     def openSettingsDialog(self):
         d = settingsdialog.SettingsDialog(self)

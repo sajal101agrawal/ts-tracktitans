@@ -36,3 +36,9 @@ from PyQt5.QtCore import Qt
 from PyQt5 import QtCore
 from PyQt5 import QtGui
 from PyQt5 import QtWidgets
+try:
+    from PyQt5 import QtWebEngineWidgets
+    WEB_ENGINE_AVAILABLE = True
+except ImportError:
+    WEB_ENGINE_AVAILABLE = False
+    print("Warning: QtWebEngine not available. Web views will not work.")

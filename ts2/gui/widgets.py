@@ -104,6 +104,32 @@ class XGraphicsView(QtWidgets.QGraphicsView):
         else:
             self.wheelChanged.emit(-1)
 
+    def mousePressEvent(self, event):
+        """Override mouse press event to ensure dock widgets remain visible"""
+        super().mousePressEvent(event)
+        self.ensureDockWidgetsVisible()
+
+    def focusInEvent(self, event):
+        """Override focus in event to ensure dock widgets remain visible"""
+        super().focusInEvent(event)
+        self.ensureDockWidgetsVisible()
+
+    def ensureDockWidgetsVisible(self):
+        """Ensure dock widgets remain visible only if in simulation view"""
+        # Get the main window instance
+        main_window = self.window()
+        if hasattr(main_window, 'trainInfoPanel') and hasattr(main_window, 'current_view'):
+            # Only show simulation panels if we're in simulation view
+            if main_window.current_view == "simulation":
+                main_window.trainInfoPanel.show()
+                main_window.serviceInfoPanel.show()
+                main_window.placeInfoPanel.show()
+                main_window.trainListPanel.show()
+                main_window.serviceListPanel.show()
+                main_window.loggerPanel.show()
+                if hasattr(main_window, 'ai_hints_dock'):
+                    main_window.ai_hints_dock.show()
+
 
 class StatusBar(QtWidgets.QStatusBar):
     """A horizontal bar with embedded progress bar

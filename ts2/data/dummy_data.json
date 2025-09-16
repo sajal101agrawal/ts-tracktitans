@@ -1,0 +1,144 @@
+{
+  "trains": [
+    {
+      "id": "T001",
+      "serviceCode": "SVC001",
+      "currentSection": "SEC_A",
+      "status": "RUNNING",
+      "speed": 75.5,
+      "maxSpeed": 120,
+      "position": {"x": 125.3, "y": 245.7},
+      "route": ["Station_A", "Junction_B", "Station_C"],
+      "plannedArrival": "14:25:00",
+      "actualArrival": "14:27:00",
+      "delay": 2,
+      "specs": {
+        "type": "Express",
+        "length": 250,
+        "weight": 450,
+        "passengers": 180,
+        "maxPassengers": 200
+      },
+      "nextStops": [
+        {"station": "Junction_B", "scheduledTime": "14:30:00", "platform": "2"},
+        {"station": "Station_C", "scheduledTime": "14:45:00", "platform": "1"}
+      ]
+    },
+    {
+      "id": "T002", 
+      "serviceCode": "SVC002",
+      "currentSection": "SEC_B",
+      "status": "STOPPED",
+      "speed": 0,
+      "maxSpeed": 100,
+      "position": {"x": 425.8, "y": 198.2},
+      "route": ["Station_B", "Junction_A", "Station_D"],
+      "plannedArrival": "14:20:00",
+      "actualArrival": "14:20:00", 
+      "delay": 0,
+      "specs": {
+        "type": "Regional",
+        "length": 180,
+        "weight": 320,
+        "passengers": 95,
+        "maxPassengers": 150
+      },
+      "nextStops": [
+        {"station": "Junction_A", "scheduledTime": "14:35:00", "platform": "1"},
+        {"station": "Station_D", "scheduledTime": "14:55:00", "platform": "3"}
+      ]
+    }
+  ],
+  "sections": [
+    {
+      "id": "SEC_A",
+      "name": "Central Junction Area", 
+      "bounds": {"x": 100, "y": 200, "width": 150, "height": 100},
+      "currentTrains": ["T001"],
+      "incomingTrains": ["T003", "T004"],
+      "signals": ["SIG_A1", "SIG_A2"],
+      "tracks": ["TRK_A1", "TRK_A2", "TRK_A3"],
+      "status": "OPERATIONAL"
+    },
+    {
+      "id": "SEC_B",
+      "name": "Northern Platform District",
+      "bounds": {"x": 400, "y": 150, "width": 200, "height": 120}, 
+      "currentTrains": ["T002"],
+      "incomingTrains": ["T005"],
+      "signals": ["SIG_B1", "SIG_B2", "SIG_B3"],
+      "tracks": ["TRK_B1", "TRK_B2"],
+      "status": "OPERATIONAL"
+    },
+    {
+      "id": "SEC_C",
+      "name": "Southern Freight Yard",
+      "bounds": {"x": 250, "y": 400, "width": 180, "height": 80},
+      "currentTrains": [],
+      "incomingTrains": ["T006"],
+      "signals": ["SIG_C1"],
+      "tracks": ["TRK_C1", "TRK_C2", "TRK_C3", "TRK_C4"],
+      "status": "MAINTENANCE"
+    }
+  ],
+  "signals": [
+    {
+      "id": "SIG_A1",
+      "name": "Central Junction North",
+      "position": {"x": 125, "y": 225},
+      "status": "GREEN",
+      "type": "MAIN_SIGNAL",
+      "section": "SEC_A",
+      "lastChanged": "2025-09-16T14:15:30Z"
+    },
+    {
+      "id": "SIG_A2", 
+      "name": "Central Junction South",
+      "position": {"x": 145, "y": 275},
+      "status": "RED",
+      "type": "MAIN_SIGNAL", 
+      "section": "SEC_A",
+      "lastChanged": "2025-09-16T14:22:15Z"
+    },
+    {
+      "id": "SIG_B1",
+      "name": "North Platform Entry",
+      "position": {"x": 420, "y": 180},
+      "status": "YELLOW",
+      "type": "PLATFORM_SIGNAL",
+      "section": "SEC_B", 
+      "lastChanged": "2025-09-16T14:20:45Z"
+    }
+  ],
+  "kpis": {
+    "punctuality": 87.5,
+    "averageDelay": 3.2,
+    "throughput": 245,
+    "utilization": 78.5,
+    "efficiency": 92.1,
+    "performance": 89.3
+  },
+  "auditLogs": [
+    {
+      "timestamp": "2025-09-16T14:27:15Z",
+      "action": "TRAIN_DELAYED",
+      "details": "Train T001 delayed by 2 minutes at Junction_B",
+      "user": "SYSTEM",
+      "severity": "WARNING"
+    },
+    {
+      "timestamp": "2025-09-16T14:25:30Z", 
+      "action": "SIGNAL_CHANGED",
+      "details": "Signal SIG_A2 changed from GREEN to RED",
+      "user": "DISPATCHER_001",
+      "severity": "INFO"
+    },
+    {
+      "timestamp": "2025-09-16T14:20:00Z",
+      "action": "MAINTENANCE_STARTED",
+      "details": "Section SEC_C marked for maintenance",
+      "user": "MAINTENANCE_TEAM",
+      "severity": "NOTICE"
+    }
+  ]
+}
