@@ -174,7 +174,10 @@ class ModernHeaderWidget(QtWidgets.QWidget):
         
         # Zoom widget - more compact
         self.zoom_widget = widgets.ZoomWidget(self)
-        self.zoom_widget.setFixedSize(150, 32)  # Reduced width from 200 to 150
+        # Ensure enough width to avoid clipping internal slider/spinbox
+        self.zoom_widget.setFixedHeight(32)
+        self.zoom_widget.setMinimumWidth(260)
+        self.zoom_widget.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed)
         self.zoom_widget.valueChanged.connect(self.zoomChanged.emit)
         self.zoom_widget.setStyleSheet("""
             QSlider::groove:horizontal {
@@ -214,6 +217,9 @@ class ModernHeaderWidget(QtWidgets.QWidget):
             }
         """)
         zoom_layout.addWidget(self.zoom_widget)
+        # Allow the zoom widget to take available horizontal space within its section
+        zoom_layout.setStretch(0, 0)
+        zoom_layout.setStretch(1, 1)
         
         zoom_container.setFixedHeight(34)
         zoom_container.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed)
