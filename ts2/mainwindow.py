@@ -63,7 +63,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.setObjectName("ts2_main_window")
         self.editorWindow = None
-        self.setGeometry(100, 100, 1200, 800)  # Larger window for new UI
+        # Set initial window size with proper minimum sizes
+        self.setGeometry(100, 100, 1400, 900)  # Increased size for better layout
+        self.setMinimumSize(1200, 700)  # Minimum size to prevent severe cropping
         self.setWindowTitle(self.tr("TrackTitans - Railway Operations Center - %s")
                             % __VERSION__)
 
@@ -310,27 +312,31 @@ class MainWindow(QtWidgets.QMainWindow):
         self.placeInfoPanel.setWidget(wid)
         self.addDockWidget(Qt.RightDockWidgetArea, self.placeInfoPanel)
 
-        # Trains
+        # Trains (Bottom Panel - Always visible in simulation)
         self.trainListPanel = QtWidgets.QDockWidget(self.tr("Trains"), self)
         self.trainListPanel.setFeatures(
             QtWidgets.QDockWidget.DockWidgetMovable |
             QtWidgets.QDockWidget.DockWidgetFloatable
         )
-        # Ensure dock widget cannot be closed accidentally
+        # Ensure dock widget cannot be closed or hidden accidentally
         self.trainListPanel.setFeatures(self.trainListPanel.features() & ~QtWidgets.QDockWidget.DockWidgetClosable)
         self.trainListPanel.setObjectName("trains_panel")
         self.trainListView = trainlistview.TrainListView(self)
         self.simulationLoaded.connect(self.trainListView.setupTrainList)
         self.trainListPanel.setWidget(self.trainListView)
         self.addDockWidget(Qt.BottomDockWidgetArea, self.trainListPanel)
+        
+        # Ensure trains panel is visible by default
+        self.trainListPanel.setVisible(True)
+        self.trainListPanel.show()
 
-        # Services
+        # Services (Bottom Panel - Always visible in simulation)
         self.serviceListPanel = QtWidgets.QDockWidget(self.tr("Services"), self)
         self.serviceListPanel.setFeatures(
             QtWidgets.QDockWidget.DockWidgetMovable |
             QtWidgets.QDockWidget.DockWidgetFloatable
         )
-        # Ensure dock widget cannot be closed accidentally
+        # Ensure dock widget cannot be closed or hidden accidentally
         self.serviceListPanel.setFeatures(self.serviceListPanel.features() & ~QtWidgets.QDockWidget.DockWidgetClosable)
         self.serviceListPanel.setObjectName("services_panel")
         self.serviceListView = servicelistview.ServiceListView(self)
@@ -338,6 +344,14 @@ class MainWindow(QtWidgets.QMainWindow):
         self.serviceListPanel.setWidget(self.serviceListView)
         self.addDockWidget(Qt.BottomDockWidgetArea, self.serviceListPanel)
         self.tabifyDockWidget(self.serviceListPanel, self.trainListPanel)
+        
+        # Ensure services panel is visible by default
+        self.serviceListPanel.setVisible(True)
+        self.serviceListPanel.show()
+        
+        # Make trains panel the active tab by default
+        self.trainListPanel.raise_()
+        self.trainListPanel.activateWindow()
 
         # Message Logger
         self.loggerPanel = QtWidgets.QDockWidget(self.tr("Messages"), self)
@@ -382,13 +396,13 @@ class MainWindow(QtWidgets.QMainWindow):
         
         # Create stacked widget for different views (expanding)
         self.view_stack = QtWidgets.QStackedWidget()
-        self.view_stack.setMinimumWidth(800)  # Prevent cropping
+        self.view_stack.setMinimumWidth(900)  # Increased minimum width to prevent cropping
         self.view_stack.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
         content_layout.addWidget(self.view_stack)
         
         # Set layout proportions to prevent cropping
-        content_layout.setStretch(0, 0)  # Sidebar fixed
-        content_layout.setStretch(1, 1)  # View stack expands
+        content_layout.setStretch(0, 0)  # Sidebar fixed width
+        content_layout.setStretch(1, 2)  # View stack expands with higher priority
         
         # Add content area to main layout
         main_layout.addWidget(content_container)
@@ -424,13 +438,32 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.refreshRecent()
         settings.restoreWindow(self)
+        
+        # CRITICAL: Force bottom panels to be visible after settings restore
+        # settings.restoreWindow() often restores a state where panels were hidden
+        print("Forcing bottom panels visibility after settings restore...")
+        self.trainListPanel.setVisible(True)
+        self.serviceListPanel.setVisible(True)
+        self.trainListPanel.show()
+        self.serviceListPanel.show()
+        
+        # Make them non-closable to prevent accidental hiding
+        self.trainListPanel.setFeatures(self.trainListPanel.features() & ~QtWidgets.QDockWidget.DockWidgetClosable)
+        self.serviceListPanel.setFeatures(self.serviceListPanel.features() & ~QtWidgets.QDockWidget.DockWidgetClosable)
+        
+        print(f"After restore - Trains visible: {self.trainListPanel.isVisible()}")
+        print(f"After restore - Services visible: {self.serviceListPanel.isVisible()}")
 
         if args and args.file:
             if args.edit:
                 self.openEditor(args.file)
                 # else:
                 # here we call after window is shown
+        
+        # Final check to ensure bottom panels are visible at startup
+        QtCore.QTimer.singleShot(50, self.ensureBottomPanelsVisible)
         QtCore.QTimer.singleShot(100, self.onAfterShow)
+        QtCore.QTimer.singleShot(200, lambda: self.onViewChanged("simulation"))  # Force simulation view setup
         
     def setupNewViews(self):
         """Setup all the new view components"""
@@ -490,9 +523,42 @@ class MainWindow(QtWidgets.QMainWindow):
         
         # Set default view
         self.view_stack.setCurrentIndex(0)  # Start with simulation view
+        self.current_view = "simulation"  # Explicitly set current view
+        
+        # Ensure bottom panels (trains & services) are visible for simulation
+        self.ensureBottomPanelsVisible()
         
         # Ensure simulation dock panels are visible initially
         self.onViewChanged("simulation")
+        
+    def ensureBottomPanelsVisible(self):
+        """Ensure trains and services panels are visible in simulation view"""
+        print("Ensuring bottom panels visibility for simulation view...")
+        
+        # Only show bottom panels if we're in simulation view
+        if hasattr(self, 'current_view') and self.current_view == "simulation":
+            # Force visibility of bottom panels
+            if hasattr(self, 'trainListPanel'):
+                self.trainListPanel.setVisible(True)
+                self.trainListPanel.show()
+                print(f"Trains panel visible: {self.trainListPanel.isVisible()}")
+            
+            if hasattr(self, 'serviceListPanel'):
+                self.serviceListPanel.setVisible(True)
+                self.serviceListPanel.show()
+                print(f"Services panel visible: {self.serviceListPanel.isVisible()}")
+            
+            # Set trains as the default active tab
+            if hasattr(self, 'trainListPanel'):
+                self.trainListPanel.raise_()
+        else:
+            print("Not in simulation view - bottom panels should be hidden")
+            
+        # Ensure they can't be accidentally closed (but can be hidden in other views)
+        if hasattr(self, 'trainListPanel'):
+            self.trainListPanel.setFeatures(self.trainListPanel.features() & ~QtWidgets.QDockWidget.DockWidgetClosable)
+        if hasattr(self, 'serviceListPanel'):
+            self.serviceListPanel.setFeatures(self.serviceListPanel.features() & ~QtWidgets.QDockWidget.DockWidgetClosable)
         
     @QtCore.pyqtSlot(str)
     def onViewChanged(self, view_name):
@@ -501,26 +567,51 @@ class MainWindow(QtWidgets.QMainWindow):
             self.view_stack.setCurrentIndex(self.view_index_map[view_name])
             self.current_view = view_name
             
-            # Show simulation panels only in simulation view
-            # Hide them in other views (editor, analytics, etc.)
+            # Panel visibility management based on view
             if view_name == "simulation":
-                # Show all simulation-related panels
+                # SIMULATION VIEW - Show all panels
+                print("Switching to simulation view - showing all panels")
+                
+                # Right-side panels
                 self.trainInfoPanel.show()
                 self.serviceInfoPanel.show() 
                 self.placeInfoPanel.show()
+                self.loggerPanel.show()
+                
+                # Bottom panels (Trains & Services) - ONLY visible in simulation view
                 self.trainListPanel.show()
                 self.serviceListPanel.show()
-                self.loggerPanel.show()
+                self.trainListPanel.setVisible(True)
+                self.serviceListPanel.setVisible(True)
+                
+                # Ensure trains panel is the active tab
+                self.trainListPanel.raise_()
+                
+                # AI hints available
                 self.ai_hints_dock.show()
+                
+                print(f"Simulation panels visible: Trains={self.trainListPanel.isVisible()}, Services={self.serviceListPanel.isVisible()}")
+                
             else:
-                # Hide simulation panels for other views
+                # OTHER VIEWS - Hide simulation-specific panels
+                print(f"Switching to {view_name} view - hiding simulation panels")
+                
+                # Hide right-side simulation panels
                 self.trainInfoPanel.hide()
                 self.serviceInfoPanel.hide()
                 self.placeInfoPanel.hide() 
+                self.loggerPanel.hide()
+                
+                # Hide bottom panels (trains & services) - only for simulation view
                 self.trainListPanel.hide()
                 self.serviceListPanel.hide()
-                self.loggerPanel.hide()
-                self.ai_hints_dock.hide()
+                self.trainListPanel.setVisible(False)
+                self.serviceListPanel.setVisible(False)
+                
+                # Keep AI hints available in all views
+                self.ai_hints_dock.show()
+                
+                print(f"Bottom panels hidden in {view_name} view")
             
     @QtCore.pyqtSlot(str)
     def onSectionSelected(self, section_id):
@@ -542,6 +633,16 @@ class MainWindow(QtWidgets.QMainWindow):
     @QtCore.pyqtSlot()
     def onAfterShow(self):
         """Fires a few moments after window shows"""
+        # FINAL enforcement of bottom panel visibility
+        print("onAfterShow: Final bottom panels enforcement...")
+        self.trainListPanel.setVisible(True)
+        self.serviceListPanel.setVisible(True)
+        self.trainListPanel.show()
+        self.serviceListPanel.show()
+        self.trainListPanel.raise_()
+        print(f"Final check - Trains visible: {self.trainListPanel.isVisible()}")
+        print(f"Final check - Services visible: {self.serviceListPanel.isVisible()}")
+        
         if not settings.b(settings.INITIAL_SETUP, False):
             self.openSettingsDialog()
 
@@ -753,6 +854,9 @@ class MainWindow(QtWidgets.QMainWindow):
             self.modern_header.setScore(0) 
             self.modern_header.setPauseState(True)
             self.modern_header.setSimulationTitle(None)
+            
+        # Ensure bottom panels remain visible even when simulation closes
+        self.ensureBottomPanelsVisible()
 
         # Menus
         self.saveGameAsAction.setEnabled(False)
@@ -969,6 +1073,32 @@ class MainWindow(QtWidgets.QMainWindow):
             if train.isOnScenery():
                 trackItem = train.trainHead.trackItem
                 self.view.centerOn(trackItem.graphicsItem)
+
+    def eventFilter(self, obj, event):
+        """Handle window resize events for responsive layout"""
+        if obj is self and event.type() == QtCore.QEvent.Resize:
+            self.handleWindowResize(event.size())
+        return super().eventFilter(obj, event)
+        
+    def handleWindowResize(self, size):
+        """Handle window resize for responsive layout adjustments"""
+        width = size.width()
+        height = size.height()
+        
+        # Adjust layout based on window size
+        if width < 1300:  # Smaller window
+            # Make header more compact
+            if hasattr(self, 'modern_header'):
+                # Could adjust header sections here if needed
+                pass
+                
+            # Ensure view stack still has enough space
+            if hasattr(self, 'view_stack'):
+                self.view_stack.setMinimumWidth(max(600, width - 300))
+        else:  # Larger window
+            # Restore normal sizing
+            if hasattr(self, 'view_stack'):
+                self.view_stack.setMinimumWidth(900)
 
 
 def wsOnMessage(ws, message):

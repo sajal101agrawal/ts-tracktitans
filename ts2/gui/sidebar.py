@@ -340,14 +340,16 @@ class TrainManagementWidget(QtWidgets.QWidget):
     def setupUI(self):
         """Setup train management UI with anti-cropping layout"""
         layout = QtWidgets.QHBoxLayout(self)
-        layout.setContentsMargins(15, 15, 15, 15)
-        layout.setSpacing(20)
+        layout.setContentsMargins(10, 10, 10, 10)  # Reduced margins for more space
+        layout.setSpacing(15)  # Reduced spacing
         
-        # Left panel - Train list (fixed optimal width)
+        # Left panel - Train list (responsive width)
         left_panel = QtWidgets.QWidget()
-        left_panel.setFixedWidth(380)  # Slightly larger for better content
+        left_panel.setMinimumWidth(320)  # Minimum required width
+        left_panel.setMaximumWidth(400)  # Maximum to prevent it from growing too large
+        left_panel.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Expanding)
         left_layout = QtWidgets.QVBoxLayout(left_panel)
-        left_layout.setContentsMargins(10, 10, 10, 10)
+        left_layout.setContentsMargins(8, 8, 8, 8)  # Reduced margins
         
         trains_label = QtWidgets.QLabel("Active Trains")
         trains_label.setStyleSheet("font-size: 16px; font-weight: bold; color: #495057; margin-bottom: 10px;")
@@ -365,9 +367,9 @@ class TrainManagementWidget(QtWidgets.QWidget):
         # Right panel - Train details and controls (fully expanding)
         right_panel = QtWidgets.QWidget() 
         right_panel.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
-        right_panel.setMinimumWidth(400)  # Minimum width to prevent excessive squashing
+        right_panel.setMinimumWidth(450)  # Increased minimum width to prevent cropping
         right_layout = QtWidgets.QVBoxLayout(right_panel)
-        right_layout.setContentsMargins(10, 10, 10, 10)
+        right_layout.setContentsMargins(8, 8, 8, 8)  # Reduced margins for more space
         
         details_label = QtWidgets.QLabel("Train Details & Controls")
         details_label.setStyleSheet("font-size: 16px; font-weight: bold; color: #495057;")
@@ -400,8 +402,8 @@ class TrainManagementWidget(QtWidgets.QWidget):
         layout.addWidget(right_panel)
         
         # Set layout proportions to prevent cropping
-        layout.setStretch(0, 0)  # Left panel fixed
-        layout.setStretch(1, 1)  # Right panel expands
+        layout.setStretch(0, 1)  # Left panel gets some flexibility
+        layout.setStretch(1, 2)  # Right panel gets more space priority
         
     def loadDummyData(self):
         """Load dummy train data"""
@@ -426,12 +428,13 @@ class TrainManagementWidget(QtWidgets.QWidget):
             self.trains_table.setItem(row, 2, QtWidgets.QTableWidgetItem(f"{train['speed']} km/h"))
             self.trains_table.setItem(row, 3, QtWidgets.QTableWidgetItem(f"{train['delay']} min"))
             
-        self.trains_table.resizeColumnsToContents()
-        
-        # Fix right-side cropping - ensure table uses full width
+        # Fix right-side cropping - ensure table uses full width with proper column distribution
         header = self.trains_table.horizontalHeader()
-        header.setStretchLastSection(True)
-        header.setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
+        header.setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeToContents)  # Train ID
+        header.setSectionResizeMode(1, QtWidgets.QHeaderView.Stretch)  # Status (expandable)
+        header.setSectionResizeMode(2, QtWidgets.QHeaderView.ResizeToContents)  # Speed
+        header.setSectionResizeMode(3, QtWidgets.QHeaderView.ResizeToContents)  # Delay
+        header.setStretchLastSection(False)  # Let us control the sizing manually
         
     def onTrainSelected(self):
         """Handle train selection"""
@@ -594,9 +597,11 @@ class SystemStatusWidget(QtWidgets.QWidget):
             self.signals_table.setItem(row, 3, QtWidgets.QTableWidgetItem(signal['type']))
             self.signals_table.setItem(row, 4, QtWidgets.QTableWidgetItem(signal['lastChanged']))
             
-        self.signals_table.resizeColumnsToContents()
-        
-        # Fix right-side cropping - ensure table uses full width
+        # Fix right-side cropping - ensure table uses full width with proper column distribution
         header = self.signals_table.horizontalHeader()
-        header.setStretchLastSection(True)
-        header.setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
+        header.setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeToContents)  # Signal ID
+        header.setSectionResizeMode(1, QtWidgets.QHeaderView.Stretch)  # Name (expandable)
+        header.setSectionResizeMode(2, QtWidgets.QHeaderView.ResizeToContents)  # Status
+        header.setSectionResizeMode(3, QtWidgets.QHeaderView.ResizeToContents)  # Type
+        header.setSectionResizeMode(4, QtWidgets.QHeaderView.ResizeToContents)  # Last Changed
+        header.setStretchLastSection(False)  # Manual control

@@ -39,7 +39,7 @@ class ModernHeaderWidget(QtWidgets.QWidget):
         self.setupUI()
         
     def setupUI(self):
-        """Setup the modern header UI with perfect layout"""
+        """Setup the modern header UI with responsive layout"""
         self.setFixedHeight(50)
         self.setStyleSheet("""
             ModernHeaderWidget {
@@ -48,10 +48,10 @@ class ModernHeaderWidget(QtWidgets.QWidget):
             }
         """)
         
-        # Main horizontal layout
+        # Main horizontal layout with better space management
         main_layout = QtWidgets.QHBoxLayout(self)
-        main_layout.setContentsMargins(15, 8, 15, 8)
-        main_layout.setSpacing(20)
+        main_layout.setContentsMargins(10, 6, 10, 6)  # Reduced margins
+        main_layout.setSpacing(12)  # Reduced spacing
         
         # File Actions Section
         self.setupFileSection(main_layout)
@@ -59,7 +59,7 @@ class ModernHeaderWidget(QtWidgets.QWidget):
         # Speed Control Section  
         self.setupSpeedSection(main_layout)
         
-        # Zoom Control Section
+        # Zoom Control Section (make collapsible on small screens)
         self.setupZoomSection(main_layout)
         
         # Performance Section
@@ -68,10 +68,14 @@ class ModernHeaderWidget(QtWidgets.QWidget):
         # Time Control Section
         self.setupTimeSection(main_layout)
         
-        # Flexible spacer
-        main_layout.addStretch()
+        # Flexible spacer (but limited)
+        spacer = QtWidgets.QWidget()
+        spacer.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Preferred)
+        spacer.setMinimumWidth(20)  # Minimum spacer width
+        spacer.setMaximumWidth(100)  # Maximum spacer width
+        main_layout.addWidget(spacer)
         
-        # Simulation Title Section
+        # Simulation Title Section (most important, gets priority)
         self.setupTitleSection(main_layout)
         
     def setupFileSection(self, main_layout):
@@ -155,35 +159,35 @@ class ModernHeaderWidget(QtWidgets.QWidget):
         main_layout.addWidget(speed_container)
         
     def setupZoomSection(self, main_layout):
-        """Setup zoom control section"""
+        """Setup zoom control section with compact layout"""
         zoom_container = QtWidgets.QWidget()
         zoom_layout = QtWidgets.QHBoxLayout(zoom_container)
         zoom_layout.setContentsMargins(0, 0, 0, 0)
-        zoom_layout.setSpacing(8)
+        zoom_layout.setSpacing(6)  # Reduced spacing
         
         # Section label
         zoom_label = QtWidgets.QLabel("Zoom")
-        zoom_label.setStyleSheet("color: #6c757d; font-weight: bold; font-size: 11px;")
+        zoom_label.setStyleSheet("color: #6c757d; font-weight: bold; font-size: 10px;")
         zoom_layout.addWidget(zoom_label)
         
-        # Zoom widget
+        # Zoom widget - more compact
         self.zoom_widget = widgets.ZoomWidget(self)
-        self.zoom_widget.setFixedSize(200, 32)
+        self.zoom_widget.setFixedSize(150, 32)  # Reduced width from 200 to 150
         self.zoom_widget.valueChanged.connect(self.zoomChanged.emit)
         self.zoom_widget.setStyleSheet("""
             QSlider::groove:horizontal {
                 border: 1px solid #ced4da;
-                height: 6px;
+                height: 5px;
                 background: white;
-                border-radius: 3px;
+                border-radius: 2px;
             }
             QSlider::handle:horizontal {
                 background: #495057;
                 border: 1px solid #343a40;
-                width: 14px;
-                height: 14px;
-                border-radius: 7px;
-                margin: -5px 0;
+                width: 12px;
+                height: 12px;
+                border-radius: 6px;
+                margin: -4px 0;
             }
             QSlider::handle:horizontal:hover {
                 background: #343a40;
@@ -192,9 +196,9 @@ class ModernHeaderWidget(QtWidgets.QWidget):
                 background-color: white;
                 border: 1px solid #ced4da;
                 border-radius: 3px;
-                padding: 4px 6px;
-                font-size: 11px;
-                max-width: 50px;
+                padding: 2px 4px;
+                font-size: 10px;
+                max-width: 45px;
             }
             QSpinBox::up-button, QSpinBox::down-button {
                 width: 0px;
@@ -203,13 +207,14 @@ class ModernHeaderWidget(QtWidgets.QWidget):
                 background-color: white;
                 border: 1px solid #ced4da;
                 border-radius: 3px;
-                padding: 4px 6px;
-                font-size: 11px;
+                padding: 2px 4px;
+                font-size: 10px;
             }
         """)
         zoom_layout.addWidget(self.zoom_widget)
         
         zoom_container.setFixedHeight(34)
+        zoom_container.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed)
         main_layout.addWidget(zoom_container)
         
     def setupPerformanceSection(self, main_layout):
@@ -282,7 +287,7 @@ class ModernHeaderWidget(QtWidgets.QWidget):
         main_layout.addWidget(time_container)
         
     def setupTitleSection(self, main_layout):
-        """Setup simulation title section"""
+        """Setup simulation title section with responsive sizing"""
         title_container = QtWidgets.QWidget()
         title_layout = QtWidgets.QHBoxLayout(title_container)
         title_layout.setContentsMargins(0, 0, 0, 0)
@@ -290,21 +295,26 @@ class ModernHeaderWidget(QtWidgets.QWidget):
         self.title_label = QtWidgets.QLabel("TrackTitans - No simulation loaded")
         self.title_label.setAlignment(Qt.AlignCenter | Qt.AlignVCenter)
         self.title_label.setFixedHeight(32)
-        self.title_label.setMinimumWidth(300)
+        # Responsive width - minimum needed, maximum reasonable
+        self.title_label.setMinimumWidth(200)  # Reduced minimum
+        self.title_label.setMaximumWidth(400)  # Set reasonable maximum
+        # Allow the title to shrink and expand as needed
+        self.title_label.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed)
         self.title_label.setStyleSheet("""
             QLabel {
                 background-color: white;
                 border: 1px solid #ced4da;
                 border-radius: 3px;
-                padding: 8px 12px;
+                padding: 6px 10px;
                 color: #495057;
-                font-size: 13px;
+                font-size: 12px;
                 font-weight: 500;
             }
         """)
         title_layout.addWidget(self.title_label)
         
         title_container.setFixedHeight(34)
+        title_container.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed)
         main_layout.addWidget(title_container)
         
     def getButtonStyle(self):
