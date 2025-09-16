@@ -80,8 +80,8 @@ class ModernHeaderWidget(QtWidgets.QWidget):
         
     def setupFileSection(self, main_layout):
         """Setup file actions section"""
-        file_container = QtWidgets.QWidget()
-        file_layout = QtWidgets.QHBoxLayout(file_container)
+        self.file_container = QtWidgets.QWidget()
+        file_layout = QtWidgets.QHBoxLayout(self.file_container)
         file_layout.setContentsMargins(0, 0, 0, 0)
         file_layout.setSpacing(8)
         
@@ -104,8 +104,10 @@ class ModernHeaderWidget(QtWidgets.QWidget):
         self.edit_btn.setStyleSheet(self.getButtonStyle())
         file_layout.addWidget(self.edit_btn)
         
-        file_container.setFixedHeight(34)
-        main_layout.addWidget(file_container)
+        self.file_container.setFixedHeight(34)
+        main_layout.addWidget(self.file_container)
+        # Hide the file section in the header by default
+        self.file_container.setVisible(False)
         
     def setupSpeedSection(self, main_layout):
         """Setup speed control section"""
@@ -219,8 +221,8 @@ class ModernHeaderWidget(QtWidgets.QWidget):
         
     def setupPerformanceSection(self, main_layout):
         """Setup performance metrics section"""
-        perf_container = QtWidgets.QWidget()
-        perf_layout = QtWidgets.QHBoxLayout(perf_container)
+        self.perf_container = QtWidgets.QWidget()
+        perf_layout = QtWidgets.QHBoxLayout(self.perf_container)
         perf_layout.setContentsMargins(0, 0, 0, 0)
         perf_layout.setSpacing(8)
         
@@ -245,8 +247,10 @@ class ModernHeaderWidget(QtWidgets.QWidget):
         """)
         perf_layout.addWidget(self.score_display)
         
-        perf_container.setFixedHeight(34)
-        main_layout.addWidget(perf_container)
+        self.perf_container.setFixedHeight(34)
+        main_layout.addWidget(self.perf_container)
+        # Hide the score section in the header by default
+        self.perf_container.setVisible(False)
         
     def setupTimeSection(self, main_layout):
         """Setup time control section"""

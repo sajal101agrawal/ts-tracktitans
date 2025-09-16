@@ -165,166 +165,202 @@ class SidebarNavigation(QtWidgets.QWidget):
 
 
 class MapOverviewWidget(QtWidgets.QWidget):
-    """Interactive map overview with section search and zoom"""
+    """Interactive map overview showing OpenRailwayMap"""
     
-    # Signal for section selection
+    # Signal for section selection (kept for compatibility)
     sectionSelected = QtCore.pyqtSignal(str)
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.sections_data = []
         self.setupUI()
-        self.loadDummyData()
         
     def setupUI(self):
-        """Setup simple map overview UI - just title and map view"""
+        """Setup map overview UI - embedded Leaflet map (lightweight)"""
         layout = QtWidgets.QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(20)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+
+        if WEB_ENGINE_AVAILABLE:
+            try:
+                self.map_view = QtWebEngineWidgets.QWebEngineView()
+                self.map_view.setContextMenuPolicy(Qt.NoContextMenu)
+
+                # Tweak settings for stability
+                settings = self.map_view.settings()
+                try:
+                    settings.setAttribute(QtWebEngineWidgets.QWebEngineSettings.JavascriptEnabled, True)
+                    settings.setAttribute(QtWebEngineWidgets.QWebEngineSettings.LocalStorageEnabled, True)
+                    # Disable WebGL to avoid potential GPU-related crashes
+                    settings.setAttribute(QtWebEngineWidgets.QWebEngineSettings.WebGLEnabled, False)
+                except Exception:
+                    pass
+
+                # Load a very small Leaflet app that overlays OpenRailwayMap tiles
+                self.map_view.setHtml(self.generateLeafletHtml(), QtCore.QUrl("https://local.map/"))
+                layout.addWidget(self.map_view)
+                return
+            except Exception:
+                # If anything goes wrong, fall back to browser open UI
+                pass
+
+        # Fallback if web engine is not available or failed
+        self.createFallbackUI(layout)
         
-        # Simple centered title only
-        title = QtWidgets.QLabel("Railway Network Map")
-        title.setStyleSheet("font-size: 24px; font-weight: bold; color: #495057; margin-bottom: 20px;")
-        title.setAlignment(Qt.AlignCenter)
-        layout.addWidget(title)
+    def createFallbackUI(self, layout):
+        """Create fallback UI that opens map in browser"""
+        fallback_widget = QtWidgets.QWidget()
+        fallback_layout = QtWidgets.QVBoxLayout(fallback_widget)
+        fallback_layout.setContentsMargins(50, 50, 50, 50)
+        fallback_layout.setSpacing(30)
         
-        # Map view - stable railway network visualization
-        self.createRailwayNetworkView(layout)
-    
-    def createRailwayNetworkView(self, layout):
-        """Create stable railway network visualization"""
-        # Create main map frame
-        map_frame = QtWidgets.QFrame()
-        map_frame.setStyleSheet("""
-            QFrame {
-                background-color: white;
-                border: 1px solid #ced4da;
-                border-radius: 8px;
-            }
-        """)
+        # Header section
+        header_widget = QtWidgets.QWidget()
+        header_layout = QtWidgets.QVBoxLayout(header_widget)
+        header_layout.setSpacing(15)
         
-        map_layout = QtWidgets.QVBoxLayout(map_frame)
-        map_layout.setContentsMargins(30, 30, 30, 30)
-        map_layout.setSpacing(20)
+        # Map icon/title
+        title_label = QtWidgets.QLabel("🗺️ Railway Network Map")
+        title_label.setStyleSheet("font-size: 24px; font-weight: bold; color: #495057;")
+        title_label.setAlignment(Qt.AlignCenter)
+        header_layout.addWidget(title_label)
         
-        # Create interactive railway network grid
-        network_widget = QtWidgets.QWidget()
-        network_layout = QtWidgets.QGridLayout(network_widget)
-        network_layout.setSpacing(25)
-        network_layout.setContentsMargins(20, 20, 20, 20)
+        # Description
+        desc_label = QtWidgets.QLabel("View detailed railway infrastructure, signals, and network topology")
+        desc_label.setStyleSheet("font-size: 16px; color: #6c757d; margin: 10px;")
+        desc_label.setAlignment(Qt.AlignCenter)
+        desc_label.setWordWrap(True)
+        header_layout.addWidget(desc_label)
         
-        # Major Indian railway stations
-        stations = [
-            ("New Delhi", 0, 1, "#343a40", "Main Terminal"),
-            ("Mumbai Central", 1, 0, "#495057", "Western Hub"),
-            ("Kolkata", 2, 1, "#495057", "Eastern Gateway"),
-            ("Chennai Central", 1, 2, "#495057", "Southern Hub"),
-            ("Bangalore", 2, 0, "#6c757d", "Tech City"),
-            ("Hyderabad", 0, 2, "#6c757d", "Central Junction"),
-            ("Pune Junction", 1, 1, "#343a40", "Express Hub"),
-            ("Ahmedabad", 0, 0, "#6c757d", "Western Junction"),
-            ("Lucknow", 2, 2, "#6c757d", "Northern Terminal")
+        fallback_layout.addWidget(header_widget)
+        fallback_layout.addStretch()
+        
+        # Features section
+        features_widget = QtWidgets.QWidget()
+        features_layout = QtWidgets.QVBoxLayout(features_widget)
+        features_layout.setSpacing(15)
+        
+        features_title = QtWidgets.QLabel("Map Features")
+        features_title.setStyleSheet("font-size: 18px; font-weight: bold; color: #495057;")
+        features_title.setAlignment(Qt.AlignCenter)
+        features_layout.addWidget(features_title)
+        
+        features = [
+            "🚂 Railway infrastructure and tracks",
+            "⚡ Electrification status",
+            "🚥 Signal systems and controls", 
+            "📊 Speed limits and gauges",
+            "🏢 Stations and platforms",
+            "🔄 Real-time network status"
         ]
         
-        self.station_widgets = {}
-        
-        for name, row, col, color, description in stations:
-            station_box = QtWidgets.QFrame()
-            station_box.setFixedSize(140, 80)
-            station_box.setStyleSheet(f"""
-                QFrame {{
-                    background-color: white;
-                    border: 2px solid {color};
-                    border-radius: 8px;
-                    margin: 5px;
-                }}
-                QFrame:hover {{
-                    background-color: #f8f9fa;
-                    border-color: #343a40;
-                    border-width: 3px;
-                }}
-            """)
+        for feature in features:
+            feature_label = QtWidgets.QLabel(feature)
+            feature_label.setStyleSheet("font-size: 14px; color: #495057; margin: 5px;")
+            feature_label.setAlignment(Qt.AlignCenter)
+            features_layout.addWidget(feature_label)
             
-            station_layout = QtWidgets.QVBoxLayout(station_box)
-            station_layout.setContentsMargins(8, 8, 8, 8)
-            station_layout.setSpacing(4)
-            
-            # Station name
-            station_label = QtWidgets.QLabel(name)
-            station_label.setAlignment(Qt.AlignCenter)
-            station_label.setWordWrap(True)
-            station_label.setStyleSheet(f"font-size: 12px; font-weight: bold; color: {color};")
-            station_layout.addWidget(station_label)
-            
-            # Station description
-            desc_label = QtWidgets.QLabel(description)
-            desc_label.setAlignment(Qt.AlignCenter)
-            desc_label.setStyleSheet("font-size: 10px; color: #6c757d; font-style: italic;")
-            station_layout.addWidget(desc_label)
-            
-            # Add click functionality
-            station_box.mousePressEvent = lambda event, station=name, desc=description: self.onStationClicked(station, desc)
-            station_box.setCursor(Qt.PointingHandCursor)
-            
-            self.station_widgets[name] = station_box
-            network_layout.addWidget(station_box, row, col)
+        fallback_layout.addWidget(features_widget)
+        fallback_layout.addStretch()
         
-        map_layout.addWidget(network_widget)
+        # Action buttons
+        buttons_widget = QtWidgets.QWidget()
+        buttons_layout = QtWidgets.QVBoxLayout(buttons_widget)
+        buttons_layout.setSpacing(15)
         
-        # Bottom status and link panel
-        bottom_panel = QtWidgets.QWidget()
-        bottom_layout = QtWidgets.QHBoxLayout(bottom_panel)
-        bottom_layout.setContentsMargins(10, 5, 10, 5)
-        
-        # Network status
-        status_label = QtWidgets.QLabel("● Network Status: Operational")
-        status_label.setStyleSheet("color: #495057; font-weight: bold; font-size: 12px;")
-        bottom_layout.addWidget(status_label)
-        
-        bottom_layout.addStretch()
-        
-        # Online map link
-        online_btn = QtWidgets.QPushButton("View Full OpenRailwayMap")
-        online_btn.clicked.connect(self.openOnlineMap)
-        online_btn.setStyleSheet("""
+        # Primary button - Open full map
+        open_btn = QtWidgets.QPushButton("🌐 Open Interactive Map")
+        open_btn.clicked.connect(self.openOnlineMap)
+        open_btn.setStyleSheet("""
             QPushButton {
                 background-color: #495057;
                 border: 1px solid #495057;
-                border-radius: 4px;
-                padding: 8px 16px;
+                border-radius: 6px;
+                padding: 15px 30px;
                 color: white;
-                font-weight: 500;
-                font-size: 12px;
+                font-weight: 600;
+                font-size: 16px;
+                min-height: 50px;
             }
             QPushButton:hover {
                 background-color: #343a40;
+                transform: translateY(-1px);
             }
         """)
-        bottom_layout.addWidget(online_btn)
+        buttons_layout.addWidget(open_btn, 0, Qt.AlignCenter)
         
-        map_layout.addWidget(bottom_panel)
-        layout.addWidget(map_frame)
+        # Secondary info
+        info_label = QtWidgets.QLabel("Opens OpenRailwayMap in your default browser for best performance")
+        info_label.setStyleSheet("font-size: 12px; color: #868e96; font-style: italic;")
+        info_label.setAlignment(Qt.AlignCenter)
+        buttons_layout.addWidget(info_label)
         
-    def onStationClicked(self, station_name, description):
-        """Handle station click"""
-        QtWidgets.QMessageBox.information(
-            self, "Railway Station", 
-            f"Station: {station_name}\nType: {description}\n\nClick to view detailed station information, train schedules, and platform status."
-        )
+        fallback_layout.addWidget(buttons_widget)
+        fallback_layout.addStretch()
+        
+        layout.addWidget(fallback_widget)
+        
+    def generateLeafletHtml(self):
+        """Return minimal HTML embedding Leaflet with OpenRailwayMap overlay only."""
+        # Center over Bhopal area (23.2703, 77.403) with ~11.62 zoom as requested
+        html = """<!DOCTYPE html>
+<html lang=\"en\">
+  <head>
+    <meta charset=\"utf-8\">
+    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">
+    <title>OpenRailwayMap Embedded</title>
+    <link rel=\"stylesheet\" href=\"https://unpkg.com/leaflet@1.9.4/dist/leaflet.css\" integrity=\"sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=\" crossorigin=\"anonymous\" />
+    <style>
+      html, body, #map { height: 100%; width: 100%; margin: 0; padding: 0; }
+      .leaflet-container { background: #f1f3f5; }
+      /* Ensure overlay pane sits above base and remains colorful */
+      .leaflet-pane.leaflet-overlay-pane { z-index: 400 !important; }
+      .leaflet-pane.base-pane { z-index: 200 !important; filter: grayscale(1) brightness(0.9) contrast(1.05); }
+      .leaflet-pane.overlay-pane { z-index: 450 !important; filter: saturate(1.25) contrast(1.1); }
+    </style>
+  </head>
+  <body>
+    <div id=\"map\"></div>
+    <script src=\"https://unpkg.com/leaflet@1.9.4/dist/leaflet.js\" integrity=\"sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=\" crossorigin=\"anonymous\"></script>
+    <script>
+      (function() {
+        var map = L.map('map', { zoomSnap: 0.25, preferCanvas: true, zoomControl: true });
+        map.setView([__LAT__, __LNG__], __ZOOM__);
+
+        // Create separate panes so we can style base vs overlay differently
+        map.createPane('base');
+        map.getPane('base').classList.add('base-pane');
+        map.createPane('rail');
+        map.getPane('rail').classList.add('overlay-pane');
+
+        // Base map (lightweight OSM tiles), dimmed and desaturated via CSS filter on pane
+        var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 20,
+          detectRetina: true,
+          pane: 'base',
+          opacity: 0.85,
+          attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        // OpenRailwayMap overlay (tracks), boosted saturation/contrast via pane styling
+        var orm = L.tileLayer('https://{s}.tiles.openrailwaymap.org/standard/{z}/{x}/{y}.png', {
+          maxZoom: 20,
+          detectRetina: true,
+          pane: 'rail',
+          opacity: 1.0,
+          attribution: '&copy; OpenRailwayMap contributors'
+        }).addTo(map);
+      })();
+    </script>
+  </body>
+</html>
+"""
+        html = html.replace("__LAT__", "23.2703").replace("__LNG__", "77.403").replace("__ZOOM__", "11.62")
+        return html
         
     def openOnlineMap(self):
         """Open OpenRailwayMap in external browser"""
         import webbrowser
         webbrowser.open("https://openrailwaymap.app/#view=11.62/23.2703/77.403")
-        
-    def loadDummyData(self):
-        """Load dummy sections data"""
-        try:
-            data_file = os.path.join(os.path.dirname(__file__), '..', 'data', 'dummy_data.json')
-            # Simplified - no need to load sections data for map-only view
-            pass
-        except Exception as e:
-            print(f"Error loading dummy data: {e}")
 
 
 class TrainManagementWidget(QtWidgets.QWidget):
