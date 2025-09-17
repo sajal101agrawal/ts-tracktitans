@@ -337,7 +337,7 @@ class WhatIfAnalysisWidget(QtWidgets.QWidget):
         self.recommendations_list.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         recommendations_layout.addWidget(self.recommendations_list)
         
-        self.results_tabs.addTab(recommendations_widget, "Recommendations")
+        self.results_tabs.addTab(recommendations_widget, "Suggestions")
         
         # Bottlenecks
         bottlenecks_widget = QtWidgets.QWidget()
@@ -350,7 +350,7 @@ class WhatIfAnalysisWidget(QtWidgets.QWidget):
         self.bottlenecks_list.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         bottlenecks_layout.addWidget(self.bottlenecks_list)
         
-        self.results_tabs.addTab(bottlenecks_widget, "Bottlenecks")
+        self.results_tabs.addTab(bottlenecks_widget, "Threats")
         
         results_layout.addWidget(self.results_tabs)
         parent_layout.addWidget(results_card)
