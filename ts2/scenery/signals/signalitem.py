@@ -861,15 +861,26 @@ class SignalLibrary:
     @staticmethod
     def createSignalLibrary():
         """Returns a SignalLibrary dict with the builtin signal types and those
-        defined in tsl files in the data directory."""
+        defined in tsl files in the data directory (including subdirectories)."""
         builtinLibraryDict = json.loads(BUILTIN_SIGNAL_LIBRARY, encoding="utf-8")
+        # Discover .tsl files recursively in both general and user data directories
+        def _find_tsl_files(rootDir):
+            files = []
+            try:
+                for dirpath, _, filenames in os.walk(rootDir):
+                    for filename in filenames:
+                        if filename.endswith('.tsl'):
+                            files.append(os.path.join(dirpath, filename))
+            except OSError:
+                # Directory may not exist or be unreadable; ignore silently
+                pass
+            return files
+
         # General data directory
-        tslGenFiles = [os.path.join("data", f) for f in os.listdir("data")
-                       if f.endswith('.tsl')]
+        tslGenFiles = _find_tsl_files("data")
         # User data directory
-        tslUserFiles = [os.path.join(utils.settings.userDataDir, f)
-                        for f in os.listdir(utils.settings.userDataDir)
-                        if f.endswith('.tsl')]
+        userDataDir = getattr(utils.settings, 'userDataDir', None)
+        tslUserFiles = _find_tsl_files(userDataDir) if userDataDir else []
 
         tslFiles = list(set(tslGenFiles + tslUserFiles))
         tslFiles.sort()

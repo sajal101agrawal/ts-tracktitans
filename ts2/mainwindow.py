@@ -202,6 +202,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.modern_header.speedChanged.connect(self.onSpeedChanged)
         self.modern_header.zoomChanged.connect(self.zoom)
         self.modern_header.pauseToggled.connect(self.onPauseToggled)
+        self.modern_header.restartRequested.connect(self.onRestartRequested)
         
         # Add as a widget above the main container (not as toolbar)
         self.header_container = QtWidgets.QWidget()
@@ -320,8 +321,12 @@ class MainWindow(QtWidgets.QMainWindow):
         )
         # Ensure dock widget cannot be closed or hidden accidentally
         self.trainListPanel.setFeatures(self.trainListPanel.features() & ~QtWidgets.QDockWidget.DockWidgetClosable)
+        # Keep bottom docks from collapsing to zero height and restrict to bottom area
+        self.trainListPanel.setAllowedAreas(Qt.BottomDockWidgetArea)
+        self.trainListPanel.setMinimumHeight(120)
         self.trainListPanel.setObjectName("trains_panel")
         self.trainListView = trainlistview.TrainListView(self)
+        self.trainListView.setMinimumHeight(100)
         self.simulationLoaded.connect(self.trainListView.setupTrainList)
         self.trainListPanel.setWidget(self.trainListView)
         self.addDockWidget(Qt.BottomDockWidgetArea, self.trainListPanel)
@@ -338,8 +343,12 @@ class MainWindow(QtWidgets.QMainWindow):
         )
         # Ensure dock widget cannot be closed or hidden accidentally
         self.serviceListPanel.setFeatures(self.serviceListPanel.features() & ~QtWidgets.QDockWidget.DockWidgetClosable)
+        # Keep bottom docks from collapsing to zero height and restrict to bottom area
+        self.serviceListPanel.setAllowedAreas(Qt.BottomDockWidgetArea)
+        self.serviceListPanel.setMinimumHeight(120)
         self.serviceListPanel.setObjectName("services_panel")
         self.serviceListView = servicelistview.ServiceListView(self)
+        self.serviceListView.setMinimumHeight(100)
         self.simulationLoaded.connect(self.serviceListView.setupServiceList)
         self.serviceListPanel.setWidget(self.serviceListView)
         self.addDockWidget(Qt.BottomDockWidgetArea, self.serviceListPanel)
@@ -359,11 +368,15 @@ class MainWindow(QtWidgets.QMainWindow):
                                      QtWidgets.QDockWidget.DockWidgetFloatable)
         # Ensure dock widget cannot be closed accidentally
         self.loggerPanel.setFeatures(self.loggerPanel.features() & ~QtWidgets.QDockWidget.DockWidgetClosable)
+        # Keep bottom docks from collapsing to zero height and restrict to bottom area
+        self.loggerPanel.setAllowedAreas(Qt.BottomDockWidgetArea)
+        self.loggerPanel.setMinimumHeight(100)
         self.loggerPanel.setObjectName("logger_panel")
         self.loggerView = QtWidgets.QTreeView(self)
         self.loggerView.setItemsExpandable(False)
         self.loggerView.setRootIsDecorated(False)
         self.loggerView.setHeaderHidden(True)
+        self.loggerView.setMinimumHeight(80)
         self.loggerView.setPalette(QtGui.QPalette(Qt.black))
         self.loggerView.setVerticalScrollMode(
             QtWidgets.QAbstractItemView.ScrollPerItem
@@ -705,6 +718,19 @@ class MainWindow(QtWidgets.QMainWindow):
         QtWidgets.qApp.setOverrideCursor(Qt.WaitCursor)
         self.webSocket = WebSocketController("ws://%s:%s/ws" % (host, port), self)
         self.webSocket.connectionReady.connect(self.simulationLoad)
+        # Propagate HTTP base URL to API-driven widgets
+        try:
+            self._http_base_url = f"http://{host}:{port}"
+            if hasattr(self, "ai_hints_dock") and hasattr(self.ai_hints_dock, "hints_widget"):
+                self.ai_hints_dock.hints_widget.provider.setBaseUrl(self._http_base_url)
+            if hasattr(self, "system_status"):
+                self.system_status._base_url = self._http_base_url
+            if hasattr(self, "train_management"):
+                self.train_management._base_url = self._http_base_url
+            if hasattr(self, "kpi_dashboard") and hasattr(self.kpi_dashboard, "provider"):
+                self.kpi_dashboard.provider.setBaseUrl(self._http_base_url)
+        except Exception:
+            pass
 
     @QtCore.pyqtSlot()
     def simulationLoad(self):
@@ -785,6 +811,19 @@ class MainWindow(QtWidgets.QMainWindow):
         # Menus
         self.saveGameAsAction.setEnabled(True)
         self.propertiesAction.setEnabled(True)
+
+        # WebSocket listeners for server events impacting UI panels
+        try:
+            # AI Hints updates (new server event) and suggestions engine refresh
+            # Disable push-driven refresh to avoid repeated GETs; rely on timer and manual refresh
+            # self.webSocket.registerHandler("NEW_AI_HINTS", self, lambda _self, data: self.ai_hints_dock.hints_widget.provider.refreshHints(recompute=True))
+            # self.webSocket.registerHandler("suggestionsUpdated", self, lambda _self, data: self.ai_hints_dock.hints_widget.provider.refreshHints(recompute=True))
+
+            # Signal status changes -> refresh System Status view table
+            self.webSocket.registerHandler("SIGNAL_STATUS_CHANGED", self, lambda _self, data: getattr(self, "system_status", None) and self.system_status.loadOverviewFromApi())
+            self.webSocket.registerHandler("signalAspectChanged", self, lambda _self, data: getattr(self, "system_status", None) and self.system_status.loadOverviewFromApi())
+        except Exception:
+            pass
 
     def simulationDisconnect(self):
         """Disconnects the simulation for deletion."""
@@ -971,6 +1010,59 @@ class MainWindow(QtWidgets.QMainWindow):
         """Handle pause toggle from modern header"""
         if hasattr(self, 'simulation') and self.simulation:
             self.simulation.pause(paused)
+
+    @QtCore.pyqtSlot()
+    def onRestartRequested(self):
+        """Restart simulation via WebSocket and update UI state based on response."""
+        if not hasattr(self, 'webSocket') or not self.webSocket:
+            QtWidgets.QMessageBox.critical(self, "Not Connected", "No connection to simulation server.")
+            return
+
+        # Disable button and show busy cursor
+        try:
+            if hasattr(self, 'modern_header') and hasattr(self.modern_header, 'restart_btn'):
+                self.modern_header.restart_btn.setEnabled(False)
+        except Exception:
+            pass
+        QtWidgets.QApplication.setOverrideCursor(Qt.WaitCursor)
+
+        def on_restart_response(msg):
+            QtWidgets.QApplication.restoreOverrideCursor()
+            try:
+                if hasattr(self, 'modern_header') and hasattr(self.modern_header, 'restart_btn'):
+                    self.modern_header.restart_btn.setEnabled(True)
+            except Exception:
+                pass
+
+            ok = bool(msg and msg.get("status") == "OK")
+            if ok:
+                # Ask server to renotify current state
+                try:
+                    self.webSocket.sendRequest('server', 'renotify')
+                except Exception:
+                    pass
+
+                # Query started state to reflect Pause/Start button correctly
+                def on_is_started(state):
+                    try:
+                        started = bool(state)
+                        if hasattr(self, 'modern_header'):
+                            self.modern_header.setPauseState(not started)
+                    except Exception:
+                        pass
+
+                try:
+                    self.webSocket.sendRequest('simulation', 'isStarted', callback=on_is_started)
+                except Exception:
+                    pass
+
+                QtWidgets.QMessageBox.information(self, "Simulation Restarted", msg.get("message", "Simulation restarted successfully"))
+            else:
+                err_msg = (msg and msg.get("message")) or "Unknown error"
+                QtWidgets.QMessageBox.critical(self, "Restart Failed", f"Failed to restart simulation: {err_msg}")
+
+        # Auto-start after restart to match previous behavior
+        self.webSocket.sendRequest('simulation', 'restart', params={"autoStart": True}, callback=on_restart_response)
 
     @QtCore.pyqtSlot()
     def openPropertiesDialog(self):

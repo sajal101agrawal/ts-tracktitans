@@ -27,6 +27,7 @@ from datetime import datetime, timedelta
 from .charts import (SparklineChart, BarChart, LineChart, HeatmapChart, 
                     GaugeChart, KPITile, generateMockData)
 from .railway_kpi_dashboard import RailwayKPIDashboard
+from .analytics_provider import AuditLogsProvider
 
 # Use the new comprehensive KPI dashboard
 KPIDashboardWidget = RailwayKPIDashboard
@@ -219,8 +220,15 @@ class AuditLogsWidget(QtWidgets.QWidget):
         super().__init__(parent)
         self.logs_data = []
         self.filtered_logs = []
+        self._provider = AuditLogsProvider()
+        self._provider.itemsAdded.connect(self.onItemsAdded)
+        self._provider.itemReceived.connect(self.onItemReceived)
+        self._provider.streamStatusChanged.connect(self.onStreamStatus)
+        self._provider.errorOccurred.connect(self.onProviderError)
+        self._last_id = 0
         self.setupUI()
-        self.loadDummyData()
+        # Kick off initial backfill + live stream
+        QtCore.QTimer.singleShot(0, lambda: self._provider.start(since_id=self._last_id, limit=500))
         
     def setupUI(self):
         """Setup audit logs UI with proper layout"""
@@ -251,10 +259,17 @@ class AuditLogsWidget(QtWidgets.QWidget):
         # Severity filter
         controls_layout.addWidget(QtWidgets.QLabel("Severity:"), 0, 2)
         self.severity_combo = QtWidgets.QComboBox()
-        self.severity_combo.addItems(["All", "INFO", "WARNING", "ERROR", "NOTICE"])
+        self.severity_combo.addItems(["All", "INFO", "WARNING", "ERROR", "NOTICE"])  # keep NOTICE for compatibility
         self.severity_combo.currentTextChanged.connect(self.filterLogs)
         controls_layout.addWidget(self.severity_combo, 0, 3)
         
+        # Category filter
+        controls_layout.addWidget(QtWidgets.QLabel("Category:"), 0, 4)
+        self.category_combo = QtWidgets.QComboBox()
+        self.category_combo.addItems(["All", "route", "signal", "train", "system"]) 
+        self.category_combo.currentTextChanged.connect(self.filterLogs)
+        controls_layout.addWidget(self.category_combo, 0, 5)
+
         # Time range
         controls_layout.addWidget(QtWidgets.QLabel("Time Range:"), 1, 0)
         self.time_range_combo = QtWidgets.QComboBox()
@@ -277,8 +292,8 @@ class AuditLogsWidget(QtWidgets.QWidget):
         
         # Logs table
         self.logs_table = QtWidgets.QTableWidget()
-        self.logs_table.setColumnCount(4)
-        self.logs_table.setHorizontalHeaderLabels(["Timestamp", "Action", "Details", "Severity"])
+        self.logs_table.setColumnCount(6)
+        self.logs_table.setHorizontalHeaderLabels(["Timestamp", "Event", "Category", "Object", "Details", "Severity"])
         self.logs_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         self.logs_table.setAlternatingRowColors(True)
         self.logs_table.setSortingEnabled(True)
@@ -289,62 +304,64 @@ class AuditLogsWidget(QtWidgets.QWidget):
         self.status_label.setStyleSheet("color: #666666; font-size: 12px;")
         layout.addWidget(self.status_label)
         
-    def loadDummyData(self):
-        """Load dummy audit logs data"""
-        try:
-            data_file = os.path.join(os.path.dirname(__file__), '..', 'data', 'dummy_data.json')
-            with open(data_file, 'r') as f:
-                data = json.load(f)
-                self.logs_data = data.get('auditLogs', [])
-                
-                # Add some more dummy logs for demonstration
-                base_time = datetime.now()
-                additional_logs = [
-                    {
-                        "timestamp": (base_time - timedelta(minutes=5)).isoformat(),
-                        "action": "TRAIN_DEPARTED",
-                        "details": "Train T003 departed from Station_A on schedule",
-                        "user": "SYSTEM",
-                        "severity": "INFO"
-                    },
-                    {
-                        "timestamp": (base_time - timedelta(minutes=15)).isoformat(),
-                        "action": "SIGNAL_MALFUNCTION",
-                        "details": "Signal SIG_C1 reported communication error",
-                        "user": "SYSTEM",
-                        "severity": "ERROR"
-                    },
-                    {
-                        "timestamp": (base_time - timedelta(minutes=30)).isoformat(),
-                        "action": "USER_LOGIN",
-                        "details": "User DISPATCHER_002 logged into the system",
-                        "user": "DISPATCHER_002",
-                        "severity": "INFO"
-                    }
-                ]
-                
-                self.logs_data.extend(additional_logs)
-                self.filterLogs()
-                
-        except Exception as e:
-            print(f"Error loading dummy data: {e}")
+    def onItemsAdded(self, items):
+        # Normalize to our in-memory representation and append
+        changed = False
+        for it in items:
+            entry = self._map_api_item(it)
+            if entry is not None:
+                self.logs_data.append(entry)
+                # track last id
+                try:
+                    n = int(it.get('id', 0))
+                    if n > self._last_id:
+                        self._last_id = n
+                except Exception:
+                    pass
+                changed = True
+        if changed:
+            self.filterLogs()
+
+    def onItemReceived(self, it):
+        entry = self._map_api_item(it)
+        if entry is not None:
+            self.logs_data.append(entry)
+            try:
+                n = int(it.get('id', 0))
+                if n > self._last_id:
+                    self._last_id = n
+            except Exception:
+                pass
+            self.filterLogs()
+
+    def onStreamStatus(self, connected):
+        self._setStatus(connected=connected)
+
+    def onProviderError(self, message):
+        self._setStatus(error=message)
             
     def filterLogs(self):
         """Filter logs based on search criteria"""
         search_text = self.search_box.text().lower()
         severity_filter = self.severity_combo.currentText()
+        category_filter = self.category_combo.currentText()
         
         self.filtered_logs = []
         
         for log in self.logs_data:
-            # Search filter
-            if search_text and search_text not in log['details'].lower() and search_text not in log['action'].lower():
+            # Search filter: include event, details, category, object string
+            hay = f"{log.get('event','')} {log.get('details','')} {log.get('category','')} {log.get('object','')}".lower()
+            if search_text and search_text not in hay:
                 continue
-                
+
             # Severity filter
-            if severity_filter != "All" and log['severity'] != severity_filter:
+            if severity_filter != "All" and log.get('severity') != severity_filter:
                 continue
-                
+
+            # Category filter
+            if category_filter != "All" and log.get('category') != category_filter:
+                continue
+
             self.filtered_logs.append(log)
             
         self.updateLogsTable()
@@ -352,32 +369,41 @@ class AuditLogsWidget(QtWidgets.QWidget):
     def updateLogsTable(self):
         """Update the logs table display"""
         self.logs_table.setRowCount(len(self.filtered_logs))
-        
+
         for row, log in enumerate(self.filtered_logs):
             # Timestamp
-            timestamp = QtWidgets.QTableWidgetItem(log['timestamp'])
+            ts_text = log.get('timestamp', '')
+            timestamp = QtWidgets.QTableWidgetItem(ts_text)
             self.logs_table.setItem(row, 0, timestamp)
-            
-            # Action
-            action = QtWidgets.QTableWidgetItem(log['action'])
-            self.logs_table.setItem(row, 1, action)
-            
-            # Details
-            details = QtWidgets.QTableWidgetItem(log['details'])
-            self.logs_table.setItem(row, 2, details)
-            
+
+            # Event
+            event_text = log.get('event', '')
+            self.logs_table.setItem(row, 1, QtWidgets.QTableWidgetItem(event_text))
+
+            # Category
+            cat_text = log.get('category', '')
+            self.logs_table.setItem(row, 2, QtWidgets.QTableWidgetItem(cat_text))
+
+            # Object (compact)
+            obj_text = log.get('object', '')
+            self.logs_table.setItem(row, 3, QtWidgets.QTableWidgetItem(obj_text))
+
+            # Details (pretty)
+            det_text = log.get('details', '')
+            self.logs_table.setItem(row, 4, QtWidgets.QTableWidgetItem(det_text))
+
             # Severity with color coding
-            severity = QtWidgets.QTableWidgetItem(log['severity'])
-            if log['severity'] == 'ERROR':
-                severity.setBackground(QtGui.QColor(255, 200, 200))
-            elif log['severity'] == 'WARNING':
-                severity.setBackground(QtGui.QColor(255, 255, 200))
-            elif log['severity'] == 'INFO':
-                severity.setBackground(QtGui.QColor(200, 255, 200))
-            elif log['severity'] == 'NOTICE':
-                severity.setBackground(QtGui.QColor(220, 220, 255))
-                
-            self.logs_table.setItem(row, 3, severity)
+            sev = (log.get('severity') or '').upper()
+            severity_item = QtWidgets.QTableWidgetItem(sev)
+            if sev == 'ERROR':
+                severity_item.setBackground(QtGui.QColor(255, 200, 200))
+            elif sev == 'WARNING' or sev == 'WARN':
+                severity_item.setBackground(QtGui.QColor(255, 255, 200))
+            elif sev == 'INFO':
+                severity_item.setBackground(QtGui.QColor(200, 255, 200))
+            elif sev == 'NOTICE':
+                severity_item.setBackground(QtGui.QColor(220, 220, 255))
+            self.logs_table.setItem(row, 5, severity_item)
             
         self.logs_table.resizeColumnsToContents()
         
@@ -389,8 +415,8 @@ class AuditLogsWidget(QtWidgets.QWidget):
         self.status_label.setText(f"Showing {len(self.filtered_logs)} of {len(self.logs_data)} log entries")
         
     def refreshLogs(self):
-        """Refresh the logs data"""
-        self.loadDummyData()
+        """Refresh the logs data from server (HTTP backfill)."""
+        self._provider.backfill(limit=500)
         
     def exportLogs(self):
         """Export filtered logs to CSV"""
@@ -407,15 +433,62 @@ class AuditLogsWidget(QtWidgets.QWidget):
         if file_path:
             try:
                 with open(file_path, 'w') as f:
-                    f.write("Timestamp,Action,Details,User,Severity\n")
+                    f.write("id,timestamp,event,category,severity,object,details\n")
                     for log in self.filtered_logs:
-                        timestamp = log["timestamp"]
-                        action = log["action"]
-                        details = log["details"]
-                        user = log["user"]
-                        severity = log["severity"]
-                        f.write(f'"{timestamp}","{action}","{details}","{user}","{severity}"\n')
+                        id_ = log.get("id", "")
+                        timestamp = log.get("timestamp", "")
+                        event = log.get("event", "")
+                        category = log.get("category", "")
+                        severity = log.get("severity", "")
+                        obj = log.get("object", "")
+                        details = log.get("details", "").replace('\n', ' ')
+                        f.write(f'"{id_}","{timestamp}","{event}","{category}","{severity}","{obj}","{details}"\n')
                 
                 QtWidgets.QMessageBox.information(self, "Export Complete", f"Logs exported to {file_path}")
             except Exception as e:
                 QtWidgets.QMessageBox.critical(self, "Export Error", f"Failed to export logs: {str(e)}")
+
+    def _map_api_item(self, it):
+        # Expect shape per new API; map to flattened strings for table
+        if not isinstance(it, dict):
+            return None
+        obj = it.get('object') or {}
+        obj_str_parts = []
+        if isinstance(obj, dict):
+            if obj.get('type'):
+                obj_str_parts.append(str(obj.get('type')))
+            if obj.get('id'):
+                obj_str_parts.append(str(obj.get('id')))
+            if obj.get('serviceCode'):
+                obj_str_parts.append(str(obj.get('serviceCode')))
+        obj_str = " / ".join(obj_str_parts)
+
+        details = it.get('details')
+        if isinstance(details, dict):
+            try:
+                # Compact JSON for display
+                details_str = json.dumps(details, separators=(",", ":"))
+            except Exception:
+                details_str = str(details)
+        else:
+            details_str = str(details) if details is not None else ""
+
+        entry = {
+            "id": it.get('id', ''),
+            "timestamp": it.get('timestamp', ''),
+            "event": it.get('event', ''),
+            "category": it.get('category', ''),
+            "severity": it.get('severity', ''),
+            "object": obj_str,
+            "details": details_str,
+        }
+        return entry
+
+    def _setStatus(self, connected=None, error=None):
+        # Update status footer text
+        parts = [f"Showing {len(self.filtered_logs)} of {len(self.logs_data)} log entries"]
+        if connected is not None:
+            parts.append("Live: ON" if connected else "Live: OFF")
+        if error:
+            parts.append(f"Error: {error}")
+        self.status_label.setText(" | ".join(parts))

@@ -97,11 +97,6 @@ class SidebarNavigation(QtWidgets.QWidget):
         title_label.setAlignment(Qt.AlignCenter)
         header_layout.addWidget(title_label)
         
-        subtitle_label = QtWidgets.QLabel("Railway Operations")
-        subtitle_label.setStyleSheet("font-size: 11px; color: rgba(255,255,255,0.8);")
-        subtitle_label.setAlignment(Qt.AlignCenter)
-        header_layout.addWidget(subtitle_label)
-        
         layout.addWidget(header)
         
         # Navigation buttons
@@ -117,12 +112,10 @@ class SidebarNavigation(QtWidgets.QWidget):
         nav_items = [
             ("simulation", "Simulation View"),
             ("map_overview", "Map Overview"),
-            ("train_management", "Train Management"),
             ("system_status", "System Status"), 
             ("whatif_analysis", "What-If Analysis"),
             ("kpi_dashboard", "KPI Dashboard"),
-            ("audit_logs", "Audit Logs"),
-            ("settings", "Settings")
+            ("audit_logs", "Audit Logs")
         ]
         
         for view_name, display_text in nav_items:
@@ -369,9 +362,11 @@ class TrainManagementWidget(QtWidgets.QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.trains_data = []
+        self._base_url = "http://localhost:22222"
+        self._session = None
         self.selected_train = None
         self.setupUI()
-        self.loadDummyData()
+        self.loadTrainsFromApi()
         
     def setupUI(self):
         """Setup train management UI with anti-cropping layout"""
@@ -432,6 +427,9 @@ class TrainManagementWidget(QtWidgets.QWidget):
         for btn in [self.accept_btn, self.reroute_btn, self.halt_btn, self.ai_hint_btn]:
             btn.setMinimumHeight(35)
             controls_layout.addWidget(btn)
+        self.accept_btn.clicked.connect(self.onAcceptRoute)
+        self.reroute_btn.clicked.connect(self.onReroute)
+        self.halt_btn.clicked.connect(self.onHalt)
             
         right_layout.addWidget(controls_frame)
         
@@ -452,6 +450,7 @@ class TrainManagementWidget(QtWidgets.QWidget):
         except Exception as e:
             print(f"Error loading dummy data: {e}")
             
+    @QtCore.pyqtSlot()
     def updateTrainsTable(self):
         """Update the trains table"""
         self.trains_table.setRowCount(len(self.trains_data))
@@ -535,6 +534,66 @@ class TrainManagementWidget(QtWidgets.QWidget):
         
         self.details_layout.addWidget(specs_group)
 
+    def _http(self):
+        import requests
+        if self._session is None:
+            self._session = requests.Session()
+        return self._session
+
+    def loadTrainsFromApi(self, section_id=None):
+        """Fetch current trains for a section from the server API."""
+        import threading
+
+        def _run():
+            try:
+                sid = section_id or "ALL"
+                url = f"{self._base_url}/api/trains/section/{sid}"
+                resp = self._http().get(url, timeout=5)
+                resp.raise_for_status()
+                data = resp.json()
+                trains = data.get('currentTrains') or data.get('trains') or []
+                self.trains_data = trains
+                QtCore.QMetaObject.invokeMethod(self, "updateTrainsTable", Qt.QueuedConnection)
+            except Exception as e:
+                print(f"Error loading trains: {e}")
+
+        threading.Thread(target=_run, daemon=True).start()
+
+    def _post_route_action(self, action, new_route=None, reason=None):
+        if not self.selected_train:
+            return
+        import threading
+        body = {"action": action}
+        if new_route:
+            body["newRoute"] = new_route
+        if reason:
+            body["reason"] = reason
+
+        def _run(train_id):
+            try:
+                url = f"{self._base_url}/api/trains/{train_id}/route"
+                resp = self._http().post(url, json=body, timeout=5)
+                resp.raise_for_status()
+                self.loadTrainsFromApi()
+                QtWidgets.QMessageBox.information(self, "Success", f"Action {action} sent for train {train_id}")
+            except Exception as e:
+                QtWidgets.QMessageBox.critical(self, "Error", f"Failed to send action: {e}")
+
+        train_id = self.selected_train.get('id') or self.selected_train.get('trainId')
+        threading.Thread(target=_run, args=(train_id,), daemon=True).start()
+
+    def onAcceptRoute(self):
+        self._post_route_action("ACCEPT")
+
+    def onReroute(self):
+        text, ok = QtWidgets.QInputDialog.getText(self, "Reroute", "Enter new route as comma-separated stops:")
+        if ok and text.strip():
+            new_route = [s.strip() for s in text.split(',') if s.strip()]
+            self._post_route_action("REROUTE", new_route=new_route, reason="Manual reroute")
+
+    def onHalt(self):
+        self._post_route_action("HALT", reason="Dispatcher halt")
+
 
 class SystemStatusWidget(QtWidgets.QWidget):
     """System status view for signals and maintenance"""
@@ -542,8 +601,16 @@ class SystemStatusWidget(QtWidgets.QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.signals_data = []
+        self.overview_data = {}
+        self._base_url = "http://localhost:22222"
+        self._session = None
         self.setupUI()
-        self.loadDummyData()
+        self.loadOverviewFromApi()
+        
+        # Auto-refresh timer (3s)
+        self.refresh_timer = QtCore.QTimer()
+        self.refresh_timer.timeout.connect(self.loadOverviewFromApi)
+        self.refresh_timer.start(3000)
         
     def setupUI(self):
         """Setup system status UI with proper layout"""
@@ -556,15 +623,35 @@ class SystemStatusWidget(QtWidgets.QWidget):
         header.setStyleSheet("font-size: 18px; font-weight: bold; color: #495057; margin-bottom: 10px;")
         layout.addWidget(header)
         
-        # Signals table
-        signals_group = QtWidgets.QGroupBox("Traffic Signals")
-        signals_group.setStyleSheet("QGroupBox { font-weight: bold; color: #495057; }")
-        signals_layout = QtWidgets.QVBoxLayout(signals_group)
-        signals_layout.setContentsMargins(10, 15, 10, 10)
+        # KPI strip
+        kpi_frame = QtWidgets.QFrame()
+        kpi_frame.setStyleSheet("QFrame { background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; }")
+        kpi_layout = QtWidgets.QHBoxLayout(kpi_frame)
+        kpi_layout.setContentsMargins(10, 8, 10, 8)
+        kpi_layout.setSpacing(20)
         
-        self.signals_table = QtWidgets.QTableWidget()
-        self.signals_table.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
-        signals_layout.addWidget(self.signals_table)
+        def _kpi_label(title):
+            w = QtWidgets.QWidget()
+            l = QtWidgets.QVBoxLayout(w)
+            l.setContentsMargins(0, 0, 0, 0)
+            l.setSpacing(2)
+            t = QtWidgets.QLabel(title)
+            t.setStyleSheet("color: #6c757d; font-size: 12px;")
+            v = QtWidgets.QLabel("-")
+            v.setStyleSheet("font-size: 20px; font-weight: 600; color: #343a40;")
+            l.addWidget(t)
+            l.addWidget(v)
+            return w, v
+        
+        kpi_util_widget, self.kpi_util_value = _kpi_label("Utilization")
+        kpi_trains_widget, self.kpi_trains_value = _kpi_label("Active Trains")
+        kpi_signals_widget, self.kpi_signals_value = _kpi_label("Signals")
+        kpi_routes_widget, self.kpi_routes_value = _kpi_label("Routes")
+        
+        for w in [kpi_util_widget, kpi_trains_widget, kpi_signals_widget, kpi_routes_widget]:
+            kpi_layout.addWidget(w)
+        kpi_layout.addStretch()
+        layout.addWidget(kpi_frame)
         
         # Control buttons
         controls_frame = QtWidgets.QFrame()
@@ -595,21 +682,92 @@ class SystemStatusWidget(QtWidgets.QWidget):
             btn.setMinimumHeight(35)
             btn.setStyleSheet(button_style)
             controls_layout.addWidget(btn)
+        self.refresh_btn.clicked.connect(self.loadOverviewFromApi)
+        self.change_signal_btn.clicked.connect(self.onChangeSignal)
             
-        signals_layout.addWidget(controls_frame)
-        layout.addWidget(signals_group)
+        layout.addWidget(controls_frame)
         
-    def loadDummyData(self):
-        """Load dummy signals data"""
-        try:
-            data_file = os.path.join(os.path.dirname(__file__), '..', 'data', 'dummy_data.json')
-            with open(data_file, 'r') as f:
-                data = json.load(f)
-                self.signals_data = data.get('signals', [])
-                self.updateSignalsTable()
-        except Exception as e:
-            print(f"Error loading dummy data: {e}")
+        # Tabbed tables: Signals, Tracks, Routes, Trains
+        self.tabs = QtWidgets.QTabWidget()
+        self.signals_table = QtWidgets.QTableWidget()
+        self.tracks_table = QtWidgets.QTableWidget()
+        self.routes_table = QtWidgets.QTableWidget()
+        self.trains_table = QtWidgets.QTableWidget()
+        
+        self.signals_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+        for tbl in [self.signals_table, self.tracks_table, self.routes_table, self.trains_table]:
+            tbl.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+            tbl.setAlternatingRowColors(True)
+            tbl.setSortingEnabled(True)
+        
+        self.tabs.addTab(self.signals_table, "Signals")
+        self.tabs.addTab(self.tracks_table, "Tracks")
+        self.tabs.addTab(self.routes_table, "Routes")
+        self.tabs.addTab(self.trains_table, "Trains")
+        layout.addWidget(self.tabs)
+        
+    def _http(self):
+        import requests
+        if self._session is None:
+            self._session = requests.Session()
+        return self._session
+
+    @QtCore.pyqtSlot()
+    def loadOverviewFromApi(self):
+        import threading
+
+        def _run():
+            try:
+                url = f"{self._base_url}/api/systems/overview"
+                resp = self._http().get(url, timeout=5)
+                resp.raise_for_status()
+                data = resp.json()
+                self.overview_data = data or {}
+                self.signals_data = (self.overview_data.get('signals')
+                                     or self.overview_data.get('data', {}).get('signals')
+                                     or [])
+                QtCore.QMetaObject.invokeMethod(self, "updateFromOverview", Qt.QueuedConnection)
+            except Exception as e:
+                print(f"Error loading overview: {e}")
+
+        threading.Thread(target=_run, daemon=True).start()
             
+    @QtCore.pyqtSlot()
+    def updateFromOverview(self):
+        """Update KPIs and all tables from cached overview data."""
+        o = self.overview_data or {}
+        # KPIs
+        occ = o.get('occupancy') or {}
+        util = occ.get('utilization')
+        try:
+            util_text = f"{float(util):.1f}%" if util is not None else "-"
+        except Exception:
+            util_text = str(util) if util is not None else "-"
+        totals = o.get('totals') or {}
+        trains_tot = totals.get('trains') or {}
+        active = trains_tot.get('active') if isinstance(trains_tot, dict) else None
+        total = trains_tot.get('total') if isinstance(trains_tot, dict) else None
+        self.kpi_util_value.setText(util_text)
+        if active is not None and total is not None:
+            self.kpi_trains_value.setText(f"{active} / {total}")
+        else:
+            self.kpi_trains_value.setText("-")
+        signals_count = totals.get('signals')
+        if signals_count is None:
+            signals_count = len(o.get('signals') or [])
+        self.kpi_signals_value.setText(str(signals_count))
+        routes_count = totals.get('routes')
+        if routes_count is None:
+            routes_count = len(o.get('routes') or [])
+        self.kpi_routes_value.setText(str(routes_count))
+        
+        # Tables
+        self.updateSignalsTable()
+        self.updateTracksTable(o.get('tracks') or [])
+        self.updateRoutesTable(o.get('routes') or [])
+        self.updateTrainsTable(o.get('trains') or [])
+
+    @QtCore.pyqtSlot()
     def updateSignalsTable(self):
         """Update the signals table"""
         self.signals_table.setRowCount(len(self.signals_data))
@@ -641,3 +799,84 @@ class SystemStatusWidget(QtWidgets.QWidget):
         header.setSectionResizeMode(3, QtWidgets.QHeaderView.ResizeToContents)  # Type
         header.setSectionResizeMode(4, QtWidgets.QHeaderView.ResizeToContents)  # Last Changed
         header.setStretchLastSection(False)  # Manual control
+
+    def updateTracksTable(self, tracks):
+        self.tracks_table.setRowCount(len(tracks))
+        self.tracks_table.setColumnCount(6)
+        self.tracks_table.setHorizontalHeaderLabels(["ID", "Type", "Name", "Place", "Code", "Occupied"])
+        for row, t in enumerate(tracks):
+            self.tracks_table.setItem(row, 0, QtWidgets.QTableWidgetItem(str(t.get('id', ''))))
+            self.tracks_table.setItem(row, 1, QtWidgets.QTableWidgetItem(str(t.get('type', ''))))
+            self.tracks_table.setItem(row, 2, QtWidgets.QTableWidgetItem(str(t.get('name', ''))))
+            self.tracks_table.setItem(row, 3, QtWidgets.QTableWidgetItem(str(t.get('place', ''))))
+            self.tracks_table.setItem(row, 4, QtWidgets.QTableWidgetItem(str(t.get('trackCode', ''))))
+            occ = t.get('occupied')
+            occ_text = "Yes" if occ is True else ("No" if occ is False else "-")
+            self.tracks_table.setItem(row, 5, QtWidgets.QTableWidgetItem(occ_text))
+        header = self.tracks_table.horizontalHeader()
+        header.setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(1, QtWidgets.QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(2, QtWidgets.QHeaderView.Stretch)
+        for col in [3, 4, 5]:
+            header.setSectionResizeMode(col, QtWidgets.QHeaderView.ResizeToContents)
+        header.setStretchLastSection(False)
+
+    def updateRoutesTable(self, routes):
+        self.routes_table.setRowCount(len(routes))
+        self.routes_table.setColumnCount(5)
+        self.routes_table.setHorizontalHeaderLabels(["ID", "Begin", "End", "State", "Active"])
+        for row, r in enumerate(routes):
+            self.routes_table.setItem(row, 0, QtWidgets.QTableWidgetItem(str(r.get('id', ''))))
+            self.routes_table.setItem(row, 1, QtWidgets.QTableWidgetItem(str(r.get('beginSignal', ''))))
+            self.routes_table.setItem(row, 2, QtWidgets.QTableWidgetItem(str(r.get('endSignal', ''))))
+            self.routes_table.setItem(row, 3, QtWidgets.QTableWidgetItem(str(r.get('state', ''))))
+            act = r.get('isActive')
+            self.routes_table.setItem(row, 4, QtWidgets.QTableWidgetItem("Yes" if act else "No"))
+        header = self.routes_table.horizontalHeader()
+        for col in [0, 1, 2, 3, 4]:
+            mode = QtWidgets.QHeaderView.Stretch if col in [1, 2] else QtWidgets.QHeaderView.ResizeToContents
+            header.setSectionResizeMode(col, mode)
+        header.setStretchLastSection(False)
+
+    def updateTrainsTable(self, trains):
+        self.trains_table.setRowCount(len(trains))
+        self.trains_table.setColumnCount(6)
+        self.trains_table.setHorizontalHeaderLabels(["ID", "Service", "Status", "Active", "Speed", "Max"])
+        for row, tr in enumerate(trains):
+            self.trains_table.setItem(row, 0, QtWidgets.QTableWidgetItem(str(tr.get('id', ''))))
+            self.trains_table.setItem(row, 1, QtWidgets.QTableWidgetItem(str(tr.get('serviceCode', ''))))
+            self.trains_table.setItem(row, 2, QtWidgets.QTableWidgetItem(str(tr.get('status', ''))))
+            self.trains_table.setItem(row, 3, QtWidgets.QTableWidgetItem("Yes" if tr.get('active') else "No"))
+            speed = tr.get('speedKmh')
+            self.trains_table.setItem(row, 4, QtWidgets.QTableWidgetItem(f"{speed} km/h" if speed is not None else "-"))
+            maxs = tr.get('maxSpeed') or tr.get('maxSpeedKmh')
+            self.trains_table.setItem(row, 5, QtWidgets.QTableWidgetItem(f"{maxs} km/h" if maxs is not None else "-"))
+        header = self.trains_table.horizontalHeader()
+        header.setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(1, QtWidgets.QHeaderView.Stretch)
+        for col in [2, 3, 4, 5]:
+            header.setSectionResizeMode(col, QtWidgets.QHeaderView.ResizeToContents)
+        header.setStretchLastSection(False)
+
+    def onChangeSignal(self):
+        row = self.signals_table.currentRow()
+        if row < 0 or row >= len(self.signals_data):
+            return
+        sig = self.signals_data[row]
+        new_status, ok = QtWidgets.QInputDialog.getItem(self, "Change Signal", "New Status:", ["GREEN","YELLOW","RED"], 0, False)
+        if not ok:
+            return
+
+        import threading
+
+        def _run(sig_id):
+            try:
+                url = f"{self._base_url}/api/systems/signals/{sig_id}/status"
+                body = {"newStatus": new_status, "reason": "Manual override", "userId": "DISPATCHER_UI"}
+                resp = self._http().put(url, json=body, timeout=5)
+                resp.raise_for_status()
+                self.loadOverviewFromApi()
+            except Exception as e:
+                QtWidgets.QMessageBox.critical(self, "Error", f"Failed to change status: {e}")
+
+        threading.Thread(target=_run, args=(sig.get('id'),), daemon=True).start()

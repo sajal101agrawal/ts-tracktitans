@@ -31,6 +31,7 @@ class ModernHeaderWidget(QtWidgets.QWidget):
     speedChanged = QtCore.pyqtSignal(int)
     zoomChanged = QtCore.pyqtSignal(int)
     pauseToggled = QtCore.pyqtSignal(bool)
+    restartRequested = QtCore.pyqtSignal()
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -278,6 +279,13 @@ class ModernHeaderWidget(QtWidgets.QWidget):
         self.pause_btn.setFixedSize(60, 32)
         self.updatePauseButtonStyle()
         time_layout.addWidget(self.pause_btn)
+
+        # Restart button
+        self.restart_btn = QtWidgets.QPushButton("Restart")
+        self.restart_btn.setFixedSize(70, 32)
+        self.restart_btn.setStyleSheet(self.getButtonStyle())
+        self.restart_btn.clicked.connect(self.restartRequested.emit)
+        time_layout.addWidget(self.restart_btn)
         
         # Clock display
         self.clock_widget = widgets.ClockWidget(self)
@@ -453,4 +461,5 @@ class ModernHeaderWidget(QtWidgets.QWidget):
         self.speed_up.setEnabled(enabled)
         self.speed_down.setEnabled(enabled)
         self.pause_btn.setEnabled(enabled)
+        self.restart_btn.setEnabled(enabled)
         self.zoom_widget.setEnabled(enabled)
