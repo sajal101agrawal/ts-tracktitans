@@ -3,7 +3,7 @@
 
 #define MyAppName "TS2"
 #define MyAppVersion "0.7.9"
-#define MyAppPublisher "TS2 Team"
+#define MyAppPublisher "Team TrackTitans"
 #define MyAppURL "http://ts2.github.io"
 #define MyAppExeName "ts2.exe"
 #define PythonVersion "3.6"

@@ -1,6 +1,6 @@
 #
 #   Copyright (C) 2008-2015 by
-#     Nicolas Piganeau <npi@m4x.org> & TS2 Team
+#     Nicolas Piganeau <npi@m4x.org> & Team TrackTitans
 #
 #   This program is free software; you can redistribute it and/or modify
 #   it under the terms of the GNU General Public License as published by
