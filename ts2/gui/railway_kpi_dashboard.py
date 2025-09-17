@@ -36,6 +36,24 @@ class RailwayKPIDashboard(QtWidgets.QWidget):
         self.provider.historicalUpdated.connect(self.onHistoricalUpdated)
         self.provider.errorOccurred.connect(self.onProviderError)
         self._provider_errors = 0
+        # Charts map and metadata for historical metrics
+        self.charts_by_metric = {}
+        self.metrics_for_history = [
+            "punctuality", "averageDelay", "p90Delay", "throughput",
+            "utilization", "acceptanceRate", "openConflicts",
+            "headwayAdherence", "headwayBreaches"
+        ]
+        self.metric_meta = {
+            "punctuality": {"name": "Right-Time Performance", "unit": "%"},
+            "averageDelay": {"name": "Average Delay", "unit": "min"},
+            "p90Delay": {"name": "P90 Delay", "unit": "min"},
+            "throughput": {"name": "Throughput", "unit": "tr/h"},
+            "utilization": {"name": "Utilization", "unit": "%"},
+            "acceptanceRate": {"name": "Acceptance Rate", "unit": "%"},
+            "openConflicts": {"name": "Open Conflicts", "unit": "count"},
+            "headwayAdherence": {"name": "Headway Adherence", "unit": "%"},
+            "headwayBreaches": {"name": "Headway Breaches", "unit": "count"},
+        }
         self.setupUI()
         self.requestDataRefresh()
         
@@ -45,61 +63,123 @@ class RailwayKPIDashboard(QtWidgets.QWidget):
         self.refresh_timer.start(15000)  # 15 seconds
         
     def setupUI(self):
-        """Setup minimal analytics dashboard UI"""
+        """Setup modern analytics dashboard UI"""
         main_layout = QtWidgets.QVBoxLayout(self)
-        main_layout.setContentsMargins(10, 10, 10, 10)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # Set modern background
+        self.setStyleSheet("""
+            QWidget {
+                background-color: #f8fafc;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            }
+        """)
+
+        # Scrollable container with modern styling
+        scroll = QtWidgets.QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QtWidgets.QFrame.NoFrame)
+        scroll.setStyleSheet("""
+            QScrollArea {
+                border: none;
+                background-color: #f8fafc;
+            }
+            QScrollBar:vertical {
+                background: #e2e8f0;
+                width: 8px;
+                border-radius: 4px;
+            }
+            QScrollBar::handle:vertical {
+                background: #cbd5e1;
+                border-radius: 4px;
+                min-height: 20px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background: #94a3b8;
+            }
+        """)
+        
+        content = QtWidgets.QWidget()
+        content_layout = QtWidgets.QVBoxLayout(content)
+        content_layout.setContentsMargins(24, 24, 24, 24)
+        content_layout.setSpacing(24)
         
         # Header
-        self.setupHeader(main_layout)
+        self.setupHeader(content_layout)
         
         # KPI tiles grid
-        self.setupKPIGrid(main_layout)
+        self.setupKPIGrid(content_layout)
 
-        # Single trend chart with metric selector
-        self.setupTrendSection(main_layout)
+        # Stacked trends for all metrics with vertical scrolling
+        self.setupTrendsSection(content_layout)
+
+        scroll.setWidget(content)
+        main_layout.addWidget(scroll)
         
     def setupHeader(self, main_layout):
-        """Setup header with title and controls"""
-        header = QtWidgets.QWidget()
-        header_layout = QtWidgets.QHBoxLayout(header)
+        """Setup minimal header with essential controls only"""
+        # Simple controls row without decorative background
+        controls_row = QtWidgets.QHBoxLayout()
         
-        title = QtWidgets.QLabel("TrackTitans - Operations Analytics")
-        title.setStyleSheet("font-size: 18px; font-weight: bold; color: #343a40; margin-bottom: 6px;")
-        header_layout.addWidget(title)
+        # Time range selector with minimal styling
+        range_label = QtWidgets.QLabel("Time Range")
+        range_label.setStyleSheet("color: #64748b; font-weight: 500; font-size: 14px;")
+        controls_row.addWidget(range_label)
         
-        header_layout.addStretch()
-        
-        # Time range selector
-        header_layout.addWidget(QtWidgets.QLabel("Range:"))
         self.time_combo = QtWidgets.QComboBox()
         self.time_combo.addItems(["Last Hour", "Last 6 Hours", "Today", "Last 24h", "Last Week", "Last Month"])
         self.time_combo.setCurrentText("Today")
-        header_layout.addWidget(self.time_combo)
+        self.time_combo.setStyleSheet(self._getMinimalComboBoxStyle("#3b82f6"))
+        controls_row.addWidget(self.time_combo)
         self.time_combo.currentTextChanged.connect(self.requestDataRefresh)
         
-        # Updated timestamp label
+        controls_row.addStretch()
+        
+        # Status indicator (minimal)
         self.updated_label = QtWidgets.QLabel("Updated: --")
-        self.updated_label.setStyleSheet("color: #6c757d; font-size: 12px; margin-left: 10px;")
-        header_layout.addWidget(self.updated_label)
+        self.updated_label.setStyleSheet("""
+            color: #9ca3af; 
+            font-size: 12px; 
+            font-weight: 400;
+        """)
+        controls_row.addWidget(self.updated_label)
         
-        # Export button
-        self.export_btn = QtWidgets.QPushButton("Export CSV")
+        # Export button (minimal)
+        self.export_btn = QtWidgets.QPushButton("Export")
         self.export_btn.clicked.connect(self.exportReport)
-        self.export_btn.setStyleSheet("QPushButton { padding: 6px 12px; }")
-        header_layout.addWidget(self.export_btn)
+        self.export_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #f3f4f6;
+                color: #374151;
+                border: 1px solid #d1d5db;
+                padding: 6px 12px;
+                border-radius: 6px;
+                font-weight: 500;
+                font-size: 13px;
+            }
+            QPushButton:hover {
+                background-color: #e5e7eb;
+            }
+            QPushButton:pressed {
+                background-color: #d1d5db;
+            }
+        """)
+        controls_row.addWidget(self.export_btn)
         
-        main_layout.addWidget(header)
+        # Add controls with minimal spacing
+        controls_container = QtWidgets.QWidget()
+        controls_container.setLayout(controls_row)
+        controls_container.setStyleSheet("margin-bottom: 16px;")
+        
+        main_layout.addWidget(controls_container)
         
     def setupKPIGrid(self, main_layout):
-        """Setup a compact grid of KPI tiles bound to API fields"""
-        kpi_frame = QtWidgets.QFrame()
-        kpi_frame.setStyleSheet(
-            "QFrame { background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; margin: 6px 0; }"
-        )
-        grid = QtWidgets.QGridLayout(kpi_frame)
-        grid.setContentsMargins(10, 10, 10, 10)
-        grid.setHorizontalSpacing(10)
-        grid.setVerticalSpacing(10)
+        """Setup modern KPI tiles grid with minimal design"""
+        kpi_container = QtWidgets.QWidget()
+        grid = QtWidgets.QGridLayout(kpi_container)
+        grid.setContentsMargins(0, 0, 0, 0)
+        grid.setHorizontalSpacing(16)
+        grid.setVerticalSpacing(16)
 
         # Define KPI tiles: (tile_key, api_key, title, unit)
         self.kpi_config = [
@@ -125,50 +205,225 @@ class RailwayKPIDashboard(QtWidgets.QWidget):
             c = idx % cols
             grid.addWidget(tile, r, c)
             
-        main_layout.addWidget(kpi_frame)
+        main_layout.addWidget(kpi_container)
         
-    def setupTrendSection(self, main_layout):
-        """Setup a single historical trend chart with selectors"""
-        section = QtWidgets.QGroupBox("Historical Trend")
-        section.setStyleSheet("QGroupBox { font-weight: bold; }")
-        v = QtWidgets.QVBoxLayout(section)
-
-        # Controls row
-        controls = QtWidgets.QHBoxLayout()
-        controls.addWidget(QtWidgets.QLabel("Metric:"))
-        self.metric_combo = QtWidgets.QComboBox()
-        # Allowed metrics for historical API
-        self.metric_combo.addItems([
-            "punctuality", "rtp", "averageDelay", "p90Delay", "throughput",
-            "utilization", "acceptanceRate", "openConflicts", "headwayAdherence", "headwayBreaches"
-        ])
-        self.metric_combo.setCurrentText("punctuality")
-        self.metric_combo.currentTextChanged.connect(self._onTrendSelectorChanged)
-        controls.addWidget(self.metric_combo)
-
-        controls.addSpacing(10)
-        controls.addWidget(QtWidgets.QLabel("Period:"))
+    def setupTrendsSection(self, main_layout):
+        """Setup minimal historical trend charts section"""
+        # Simple period selector without decorative header
+        period_row = QtWidgets.QHBoxLayout()
+        
+        period_label = QtWidgets.QLabel("Period")
+        period_label.setStyleSheet("color: #64748b; font-weight: 500; font-size: 14px;")
+        period_row.addWidget(period_label)
+        
         self.period_combo = QtWidgets.QComboBox()
-        self.period_combo.addItems(["hourly", "daily", "weekly"])
-        self.period_combo.setCurrentText("hourly")
-        self.period_combo.currentTextChanged.connect(self._onTrendSelectorChanged)
-        controls.addWidget(self.period_combo)
-
-        controls.addStretch()
-        v.addLayout(controls)
-
-        # Chart
-        self.trend_chart = LineChart()
-        self.trend_chart.setFixedHeight(180)
-        v.addWidget(self.trend_chart)
-
-        main_layout.addWidget(section)
+        self.period_combo.addItems(["Hourly", "Daily", "Weekly"])
+        self.period_combo.setCurrentText("Hourly")
+        self.period_combo.setStyleSheet(self._getMinimalComboBoxStyle("#10b981"))
+        self.period_combo.currentTextChanged.connect(self._onPeriodChanged)
+        period_row.addWidget(self.period_combo)
         
-    def _onTrendSelectorChanged(self):
-        # Refetch historical when metric or period changes
-        metric = self.metric_combo.currentText()
-        period = self.period_combo.currentText()
-        self.provider.fetchHistorical(metric=metric, period=period)
+        period_row.addStretch()
+        
+        # Add period selector with minimal spacing
+        period_container = QtWidgets.QWidget()
+        period_container.setLayout(period_row)
+        period_container.setStyleSheet("margin-bottom: 16px;")
+        
+        main_layout.addWidget(period_container)
+
+        # Charts container with responsive grid
+        charts_container = QtWidgets.QWidget()
+        
+        # Use a grid layout for better organization
+        charts_grid = QtWidgets.QGridLayout(charts_container)
+        charts_grid.setContentsMargins(0, 0, 0, 0)
+        charts_grid.setSpacing(20)
+
+        # Group metrics by category for better layout
+        performance_metrics = ["punctuality", "averageDelay", "p90Delay"]
+        operational_metrics = ["throughput", "utilization", "acceptanceRate"]
+        reliability_metrics = ["openConflicts", "headwayAdherence", "headwayBreaches"]
+        
+        metric_groups = [
+            ("Performance Metrics", performance_metrics, "#10b981"),
+            ("Operational Metrics", operational_metrics, "#3b82f6"), 
+            ("Reliability Metrics", reliability_metrics, "#f59e0b")
+        ]
+
+        row = 0
+        for group_name, metrics, accent_color in metric_groups:
+            # Group header
+            group_header = QtWidgets.QLabel(group_name)
+            group_header.setStyleSheet(f"""
+                font-size: 18px;
+                font-weight: 600;
+                color: {accent_color};
+                margin: 16px 0 8px 0;
+                padding: 8px 0;
+                border-bottom: 2px solid {accent_color};
+            """)
+            charts_grid.addWidget(group_header, row, 0, 1, 2)
+            row += 1
+            
+            # Charts in this group (2 per row)
+            col = 0
+            for metric in metrics:
+                if metric not in self.metrics_for_history:
+                    continue
+                    
+                meta = self.metric_meta.get(metric, {"name": metric, "unit": ""})
+                
+                # Enhanced chart card
+                chart_card = QtWidgets.QWidget()
+                chart_card.setStyleSheet(f"""
+                    QWidget {{
+                        background-color: white;
+                        border-radius: 16px;
+                        border: 2px solid #f1f5f9;
+                        padding: 0;
+                    }}
+                    QWidget:hover {{
+                        border-color: {accent_color};
+                        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+                    }}
+                """)
+                card_layout = QtWidgets.QVBoxLayout(chart_card)
+                card_layout.setContentsMargins(20, 20, 20, 20)
+                card_layout.setSpacing(16)
+
+                # Chart header with value and trend
+                header_row = QtWidgets.QHBoxLayout()
+                
+                chart_title = QtWidgets.QLabel(meta['name'])
+                chart_title.setStyleSheet("""
+                    font-size: 16px;
+                    font-weight: 600;
+                    color: #1e293b;
+                """)
+                header_row.addWidget(chart_title)
+                
+                header_row.addStretch()
+                
+                unit_label = QtWidgets.QLabel(meta['unit'])
+                unit_label.setStyleSheet(f"""
+                    font-size: 12px;
+                    font-weight: 600;
+                    color: {accent_color};
+                    background-color: rgba({int(accent_color[1:3], 16)}, {int(accent_color[3:5], 16)}, {int(accent_color[5:7], 16)}, 0.1);
+                    padding: 4px 8px;
+                    border-radius: 12px;
+                """)
+                header_row.addWidget(unit_label)
+                
+                card_layout.addLayout(header_row)
+
+                # Chart with enhanced styling
+                chart = LineChart()
+                chart.setFixedHeight(260)  # Increased height to prevent clipping
+                chart.setAxisLabels("Time", meta.get("unit", ""))
+                chart.setStyleSheet("""
+                    QWidget {
+                        border-radius: 8px;
+                        background-color: #fafbfc;
+                    }
+                """)
+                card_layout.addWidget(chart)
+
+                self.charts_by_metric[metric] = chart
+                charts_grid.addWidget(chart_card, row, col)
+                
+                col += 1
+                if col >= 2:  # 2 charts per row
+                    col = 0
+                    row += 1
+            
+            if col > 0:  # If we ended mid-row, move to next row
+                row += 1
+
+        main_layout.addWidget(charts_container)
+        
+    def _onPeriodChanged(self):
+        """Refetch all historical series when period changes"""
+        self.fetchAllHistorical()
+        
+    def _mapPeriodToApi(self, display_text):
+        """Map display text to API parameter"""
+        mapping = {
+            "Hourly": "hourly",
+            "Daily": "daily", 
+            "Weekly": "weekly"
+        }
+        return mapping.get(display_text, "hourly")
+        
+    def _getMinimalComboBoxStyle(self, accent_color="#374151"):
+        """Get ultra-minimal combo box styling with no margins/padding"""
+        return f"""
+            QComboBox {{
+                padding: 4px 20px 4px 8px;
+                border: 1px solid #d1d5db;
+                border-radius: 0;
+                background-color: white;
+                font-size: 13px;
+                color: #374151;
+                min-width: 80px;
+                min-height: 24px;
+            }}
+            QComboBox:hover {{
+                border-color: {accent_color};
+            }}
+            QComboBox:focus {{
+                border-color: {accent_color};
+                outline: none;
+            }}
+            QComboBox::drop-down {{
+                subcontrol-origin: padding;
+                subcontrol-position: center right;
+                width: 16px;
+                border: none;
+                background-color: transparent;
+            }}
+            QComboBox::down-arrow {{
+                image: none;
+                width: 0;
+                height: 0;
+                border-left: 4px solid transparent;
+                border-right: 4px solid transparent;
+                border-top: 6px solid #6b7280;
+                margin: 0;
+            }}
+            QComboBox:hover::down-arrow {{
+                border-top-color: {accent_color};
+            }}
+            QComboBox:open::down-arrow {{
+                border-top: none;
+                border-bottom: 6px solid {accent_color};
+            }}
+            QComboBox QAbstractItemView {{
+                border: 1px solid #d1d5db;
+                background-color: white;
+                selection-background-color: {accent_color};
+                selection-color: white;
+                padding: 0;
+                margin: 0;
+                outline: none;
+            }}
+            QComboBox QAbstractItemView::item {{
+                padding: 4px 8px;
+                margin: 0;
+                border: none;
+                color: #374151;
+                font-size: 13px;
+            }}
+            QComboBox QAbstractItemView::item:hover {{
+                background-color: #f3f4f6;
+                color: #374151;
+            }}
+            QComboBox QAbstractItemView::item:selected {{
+                background-color: {accent_color};
+                color: white;
+            }}
+        """
         
     def updateAllKPIs(self):
         """Deprecated: analytics is fully server-driven."""
@@ -178,10 +433,15 @@ class RailwayKPIDashboard(QtWidgets.QWidget):
         """Trigger provider refresh using current filters; fallback to mock after repeated errors."""
         time_range = self._mapTimeRange(self.time_combo.currentText())
         self.provider.refreshKpis(time_range=time_range)
-        # Refresh historical for selected metric
-        metric = getattr(self, "metric_combo", None).currentText() if hasattr(self, "metric_combo") else "punctuality"
-        period = getattr(self, "period_combo", None).currentText() if hasattr(self, "period_combo") else "hourly"
-        self.provider.fetchHistorical(metric=metric, period=period)
+        # Refresh historical for all metrics
+        self.fetchAllHistorical()
+
+    def fetchAllHistorical(self):
+        """Fetch historical data for all configured metrics"""
+        period_display = getattr(self, "period_combo", None).currentText() if hasattr(self, "period_combo") else "Hourly"
+        period_api = self._mapPeriodToApi(period_display)
+        for m in self.metrics_for_history:
+            self.provider.fetchHistorical(metric=m, period=period_api)
 
     def _mapTimeRange(self, text):
         mapping = {
@@ -255,11 +515,10 @@ class RailwayKPIDashboard(QtWidgets.QWidget):
     @QtCore.pyqtSlot(str, dict)
     def onHistoricalUpdated(self, metric, data):
         try:
-            if not hasattr(self, "trend_chart"):
-                return
-            # Only refresh if this metric is currently selected
-            selected = self.metric_combo.currentText() if hasattr(self, "metric_combo") else None
-            if selected and metric != selected and not (metric == "punctuality" and selected == "rtp"):
+            # Map alias 'rtp' to 'punctuality'
+            key = "punctuality" if metric in ("punctuality", "rtp") else metric
+            chart = self.charts_by_metric.get(key)
+            if chart is None:
                 return
 
             series = data.get("series") or data.get("data") or []
@@ -275,27 +534,15 @@ class RailwayKPIDashboard(QtWidgets.QWidget):
                     values.append(item)
 
             if values:
-                self.trend_chart.clearSeries()
-                # Friendly name
-                name_map = {
-                    "punctuality": "Right-Time Performance",
-                    "rtp": "Right-Time Performance",
-                    "averageDelay": "Average Delay",
-                    "p90Delay": "P90 Delay",
-                    "throughput": "Throughput",
-                    "utilization": "Utilization",
-                    "acceptanceRate": "Acceptance Rate",
-                    "openConflicts": "Open Conflicts",
-                    "headwayAdherence": "Headway Adherence",
-                    "headwayBreaches": "Headway Breaches",
-                }
-                label = name_map.get(metric, metric)
-                self.trend_chart.addSeries(label, values, QtGui.QColor(73, 80, 87))
+                chart.clearSeries()
+                meta = self.metric_meta.get(key, {"name": key})
+                label = meta.get("name", key)
+                chart.addSeries(label, values, QtGui.QColor(73, 80, 87))
 
-                # Optional target lines for certain metrics
-                if metric in ("punctuality", "rtp"):
+                # Optional target lines for certain metrics (minimal)
+                if key == "punctuality":
                     target_line = [85] * len(values)
-                    self.trend_chart.addSeries("Target (85%)", target_line, QtGui.QColor(134, 142, 150))
+                    chart.addSeries("Target (85%)", target_line, QtGui.QColor(134, 142, 150))
         except Exception:
             pass
 
@@ -321,21 +568,21 @@ class RailwayKPIDashboard(QtWidgets.QWidget):
             tile.setValueColor(color)
             
     def getKPIColor(self, value, green_threshold, red_threshold, reverse=False):
-        """Get color based on KPI thresholds - minimal color scheme"""
+        """Get modern color based on KPI thresholds"""
         if reverse:
             if value <= green_threshold:
-                return "#495057"  # Dark gray (good)
+                return "#10b981"  # Modern green (good)
             elif value <= red_threshold:
-                return "#6c757d"  # Medium gray (caution)
+                return "#f59e0b"  # Modern amber (caution)
             else:
-                return "#868e96"  # Light gray (poor)
+                return "#ef4444"  # Modern red (poor)
         else:
             if value >= green_threshold:
-                return "#495057"  # Dark gray (good)
+                return "#10b981"  # Modern green (good)
             elif value >= red_threshold:
-                return "#6c757d"  # Medium gray (caution)
+                return "#f59e0b"  # Modern amber (caution)
             else:
-                return "#868e96"  # Light gray (poor)
+                return "#ef4444"  # Modern red (poor)
                 
     def updateCharts(self):
         """No-op: retained for compatibility."""

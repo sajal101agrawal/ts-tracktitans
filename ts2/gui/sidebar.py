@@ -110,7 +110,7 @@ class SidebarNavigation(QtWidgets.QWidget):
         
         # Define navigation items
         nav_items = [
-            ("simulation", "Simulation View"),
+            ("simulation", "Section view"),
             ("map_overview", "Map Overview"),
             ("system_status", "System Status"), 
             ("whatif_analysis", "What-If Analysis"),
@@ -613,86 +613,186 @@ class SystemStatusWidget(QtWidgets.QWidget):
         self.refresh_timer.start(3000)
         
     def setupUI(self):
-        """Setup system status UI with proper layout"""
-        layout = QtWidgets.QVBoxLayout(self)
-        layout.setContentsMargins(10, 10, 10, 10)
-        layout.setSpacing(15)
+        """Setup minimal system status UI"""
+        main_layout = QtWidgets.QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
         
-        # Header
-        header = QtWidgets.QLabel("System Status Monitor")
-        header.setStyleSheet("font-size: 18px; font-weight: bold; color: #495057; margin-bottom: 10px;")
-        layout.addWidget(header)
+        # Set clean background
+        self.setStyleSheet("""
+            QWidget {
+                background-color: #fafafa;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            }
+        """)
+
+        # Simple container without scroll
+        content = QtWidgets.QWidget()
+        layout = QtWidgets.QVBoxLayout(content)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(12)
         
-        # KPI strip
-        kpi_frame = QtWidgets.QFrame()
-        kpi_frame.setStyleSheet("QFrame { background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; }")
-        kpi_layout = QtWidgets.QHBoxLayout(kpi_frame)
-        kpi_layout.setContentsMargins(10, 8, 10, 8)
-        kpi_layout.setSpacing(20)
+        # Minimal header row
+        header_row = QtWidgets.QHBoxLayout()
         
-        def _kpi_label(title):
-            w = QtWidgets.QWidget()
-            l = QtWidgets.QVBoxLayout(w)
-            l.setContentsMargins(0, 0, 0, 0)
-            l.setSpacing(2)
-            t = QtWidgets.QLabel(title)
-            t.setStyleSheet("color: #6c757d; font-size: 12px;")
-            v = QtWidgets.QLabel("-")
-            v.setStyleSheet("font-size: 20px; font-weight: 600; color: #343a40;")
-            l.addWidget(t)
-            l.addWidget(v)
-            return w, v
+        # System status label
+        status_label = QtWidgets.QLabel("System Status")
+        status_label.setStyleSheet("""
+            font-size: 16px; 
+            font-weight: 600; 
+            color: #374151;
+        """)
+        header_row.addWidget(status_label)
         
-        kpi_util_widget, self.kpi_util_value = _kpi_label("Utilization")
-        kpi_trains_widget, self.kpi_trains_value = _kpi_label("Active Trains")
-        kpi_signals_widget, self.kpi_signals_value = _kpi_label("Signals")
-        kpi_routes_widget, self.kpi_routes_value = _kpi_label("Routes")
+        header_row.addStretch()
         
-        for w in [kpi_util_widget, kpi_trains_widget, kpi_signals_widget, kpi_routes_widget]:
-            kpi_layout.addWidget(w)
+        # Auto-refresh indicator
+        refresh_indicator = QtWidgets.QLabel("Auto-refresh: 3s")
+        refresh_indicator.setStyleSheet("""
+            color: #9ca3af; 
+            font-size: 11px; 
+            font-weight: 400;
+        """)
+        header_row.addWidget(refresh_indicator)
+        
+        layout.addLayout(header_row)
+        
+        # Compact KPI strip
+        kpi_container = QtWidgets.QWidget()
+        kpi_container.setStyleSheet("""
+            QWidget {
+                background-color: white;
+                border: 1px solid #e5e7eb;
+                border-radius: 6px;
+            }
+        """)
+        kpi_layout = QtWidgets.QHBoxLayout(kpi_container)
+        kpi_layout.setContentsMargins(12, 12, 12, 12)
+        kpi_layout.setSpacing(24)
+        
+        def _create_compact_kpi(title):
+            kpi_widget = QtWidgets.QWidget()
+            kpi_widget_layout = QtWidgets.QVBoxLayout(kpi_widget)
+            kpi_widget_layout.setContentsMargins(0, 0, 0, 0)
+            kpi_widget_layout.setSpacing(2)
+            
+            # Title
+            title_label = QtWidgets.QLabel(title)
+            title_label.setStyleSheet("""
+                font-size: 11px; 
+                color: #6b7280; 
+                font-weight: 500;
+            """)
+            kpi_widget_layout.addWidget(title_label)
+            
+            # Value
+            value_label = QtWidgets.QLabel("-")
+            value_label.setStyleSheet("""
+                font-size: 18px; 
+                font-weight: 600; 
+                color: #111827;
+            """)
+            kpi_widget_layout.addWidget(value_label)
+            
+            return kpi_widget, value_label
+        
+        util_widget, self.kpi_util_value = _create_compact_kpi("Utilization")
+        trains_widget, self.kpi_trains_value = _create_compact_kpi("Active Trains")
+        signals_widget, self.kpi_signals_value = _create_compact_kpi("Signals")
+        routes_widget, self.kpi_routes_value = _create_compact_kpi("Routes")
+        
+        kpi_layout.addWidget(util_widget)
+        kpi_layout.addWidget(trains_widget)
+        kpi_layout.addWidget(signals_widget)
+        kpi_layout.addWidget(routes_widget)
         kpi_layout.addStretch()
-        layout.addWidget(kpi_frame)
         
-        # Control buttons
-        controls_frame = QtWidgets.QFrame()
-        controls_frame.setFrameStyle(QtWidgets.QFrame.StyledPanel)
-        controls_frame.setStyleSheet("QFrame { background-color: #f8f9fa; border-radius: 4px; }")
-        controls_layout = QtWidgets.QHBoxLayout(controls_frame)
-        controls_layout.setContentsMargins(10, 8, 10, 8)
+        layout.addWidget(kpi_container)
         
-        self.change_signal_btn = QtWidgets.QPushButton("Change Signal Status")
-        self.maintenance_btn = QtWidgets.QPushButton("Mark for Maintenance")
+        # Minimal action buttons
+        actions_row = QtWidgets.QHBoxLayout()
+        
+        self.change_signal_btn = QtWidgets.QPushButton("Change Signal")
+        self.maintenance_btn = QtWidgets.QPushButton("Maintenance")
         self.refresh_btn = QtWidgets.QPushButton("Refresh")
         
+        # Apply minimal button styling
         button_style = """
             QPushButton {
                 background-color: white;
-                border: 1px solid #ced4da;
-                border-radius: 3px;
-                padding: 8px 12px;
-                color: #495057;
+                color: #374151;
+                border: 1px solid #d1d5db;
+                padding: 6px 12px;
+                border-radius: 4px;
                 font-weight: 500;
+                font-size: 13px;
             }
             QPushButton:hover {
-                background-color: #e9ecef;
+                background-color: #f9fafb;
+                border-color: #9ca3af;
+            }
+            QPushButton:pressed {
+                background-color: #f3f4f6;
             }
         """
         
         for btn in [self.change_signal_btn, self.maintenance_btn, self.refresh_btn]:
-            btn.setMinimumHeight(35)
             btn.setStyleSheet(button_style)
-            controls_layout.addWidget(btn)
+        
+        actions_row.addWidget(self.change_signal_btn)
+        actions_row.addWidget(self.maintenance_btn)
+        actions_row.addStretch()
+        actions_row.addWidget(self.refresh_btn)
+        
         self.refresh_btn.clicked.connect(self.loadOverviewFromApi)
         self.change_signal_btn.clicked.connect(self.onChangeSignal)
             
-        layout.addWidget(controls_frame)
+        layout.addLayout(actions_row)
         
-        # Tabbed tables: Signals, Tracks, Routes, Trains
+        # Simple tables container
+        tables_container = QtWidgets.QWidget()
+        tables_container.setStyleSheet("""
+            QWidget {
+                background-color: white;
+                border: 1px solid #e5e7eb;
+                border-radius: 6px;
+            }
+        """)
+        tables_layout = QtWidgets.QVBoxLayout(tables_container)
+        tables_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # Minimal tabs
         self.tabs = QtWidgets.QTabWidget()
-        self.signals_table = QtWidgets.QTableWidget()
-        self.tracks_table = QtWidgets.QTableWidget()
-        self.routes_table = QtWidgets.QTableWidget()
-        self.trains_table = QtWidgets.QTableWidget()
+        self.tabs.setStyleSheet("""
+            QTabWidget::pane {
+                border: none;
+                background-color: white;
+            }
+            QTabBar::tab {
+                background-color: #f9fafb;
+                color: #6b7280;
+                padding: 8px 16px;
+                margin-right: 1px;
+                border-top-left-radius: 4px;
+                border-top-right-radius: 4px;
+                font-weight: 500;
+                font-size: 13px;
+            }
+            QTabBar::tab:selected {
+                background-color: white;
+                color: #374151;
+                font-weight: 600;
+            }
+            QTabBar::tab:hover:!selected {
+                background-color: #f3f4f6;
+                color: #4b5563;
+            }
+        """)
+        
+        # Create minimal tables
+        self.signals_table = self._create_minimal_table()
+        self.tracks_table = self._create_minimal_table()
+        self.routes_table = self._create_minimal_table()
+        self.trains_table = self._create_minimal_table()
         
         self.signals_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         for tbl in [self.signals_table, self.tracks_table, self.routes_table, self.trains_table]:
@@ -700,11 +800,49 @@ class SystemStatusWidget(QtWidgets.QWidget):
             tbl.setAlternatingRowColors(True)
             tbl.setSortingEnabled(True)
         
+        # Add tables to tabs (no emojis)
         self.tabs.addTab(self.signals_table, "Signals")
-        self.tabs.addTab(self.tracks_table, "Tracks")
+        self.tabs.addTab(self.tracks_table, "Tracks") 
         self.tabs.addTab(self.routes_table, "Routes")
         self.tabs.addTab(self.trains_table, "Trains")
-        layout.addWidget(self.tabs)
+        
+        tables_layout.addWidget(self.tabs)
+        layout.addWidget(tables_container)
+        
+        main_layout.addWidget(content)
+        
+    def _create_minimal_table(self):
+        """Create a minimal styled table widget"""
+        table = QtWidgets.QTableWidget()
+        table.setStyleSheet("""
+            QTableWidget {
+                border: none;
+                background-color: white;
+                gridline-color: #f3f4f6;
+                font-size: 12px;
+            }
+            QTableWidget::item {
+                padding: 6px 8px;
+                border-bottom: 1px solid #f3f4f6;
+            }
+            QTableWidget::item:selected {
+                background-color: #f0f9ff;
+                color: #1e40af;
+            }
+            QHeaderView::section {
+                background-color: #f9fafb;
+                padding: 8px;
+                border: none;
+                border-bottom: 1px solid #e5e7eb;
+                font-weight: 600;
+                color: #374151;
+                font-size: 12px;
+            }
+            QTableWidget::item:alternate {
+                background-color: #fafafa;
+            }
+        """)
+        return table
         
     def _http(self):
         import requests

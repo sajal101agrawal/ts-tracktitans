@@ -44,51 +44,66 @@ class SimpleChart(QtWidgets.QWidget):
         rect = self.rect()
         
         # Draw background
-        painter.fillRect(rect, QtGui.QColor(250, 250, 250))
-        painter.setPen(QtGui.QPen(QtGui.QColor(200, 200, 200), 1))
+        painter.fillRect(rect, QtGui.QColor(255, 255, 255))
+        painter.setPen(QtGui.QPen(QtGui.QColor(238, 238, 238), 1))
         painter.drawRect(rect)
 
 
 class SparklineChart(SimpleChart):
-    """Simple sparkline chart for trend visualization"""
+    """Modern sparkline chart for trend visualization"""
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.color = QtGui.QColor(73, 80, 87)  # Dark gray
+        self.color = QtGui.QColor(59, 130, 246)  # Modern blue
         self.setFixedHeight(30)
         
     def paintEvent(self, event):
-        super().paintEvent(event)
-        
-        if not self.data or len(self.data) < 2:
-            return
-            
         painter = QtGui.QPainter(self)
         painter.setRenderHint(QtGui.QPainter.Antialiasing)
         
+        # Clear background
+        painter.fillRect(self.rect(), QtGui.QColor(248, 250, 252))
+        
+        if not self.data or len(self.data) < 2:
+            return
+        
         # Calculate bounds
-        margin = 5
+        margin = 2
         rect = self.rect().adjusted(margin, margin, -margin, -margin)
         
         min_val = min(self.data)
         max_val = max(self.data)
         val_range = max_val - min_val if max_val != min_val else 1
         
-        # Draw line
-        painter.setPen(QtGui.QPen(self.color, 2))
+        # Create gradient for area fill
+        gradient = QtGui.QLinearGradient(0, rect.top(), 0, rect.bottom())
+        gradient.setColorAt(0, QtGui.QColor(59, 130, 246, 60))  # Semi-transparent blue
+        gradient.setColorAt(1, QtGui.QColor(59, 130, 246, 10))  # Very light blue
         
+        # Draw area under curve
+        area_path = QtGui.QPainterPath()
         points = []
         for i, val in enumerate(self.data):
             x = rect.left() + (i / (len(self.data) - 1)) * rect.width()
             y = rect.bottom() - ((val - min_val) / val_range) * rect.height()
             points.append(QtCore.QPointF(x, y))
             
-        if len(points) > 1:
-            path = QtGui.QPainterPath()
-            path.moveTo(points[0])
+        if points:
+            area_path.moveTo(rect.left(), rect.bottom())
+            for point in points:
+                area_path.lineTo(point)
+            area_path.lineTo(rect.right(), rect.bottom())
+            area_path.closeSubpath()
+            
+            painter.fillPath(area_path, gradient)
+            
+            # Draw line
+            painter.setPen(QtGui.QPen(self.color, 2))
+            line_path = QtGui.QPainterPath()
+            line_path.moveTo(points[0])
             for point in points[1:]:
-                path.lineTo(point)
-            painter.drawPath(path)
+                line_path.lineTo(point)
+            painter.drawPath(line_path)
 
 
 class BarChart(SimpleChart):
@@ -142,12 +157,20 @@ class LineChart(SimpleChart):
         super().__init__(parent)
         self.series = {}  # name: (data, color)
         self.show_grid = True
+        self.x_label = ""
+        self.y_label = ""
         
     def addSeries(self, name, data, color=None):
-        """Add a data series"""
+        """Add a data series with modern colors"""
         if color is None:
-            colors = [QtGui.QColor(73, 80, 87), QtGui.QColor(108, 117, 125), 
-                     QtGui.QColor(134, 142, 150), QtGui.QColor(173, 181, 189)]
+            colors = [
+                QtGui.QColor(59, 130, 246),   # Blue
+                QtGui.QColor(16, 185, 129),   # Green  
+                QtGui.QColor(245, 101, 101),  # Red
+                QtGui.QColor(139, 92, 246),   # Purple
+                QtGui.QColor(245, 158, 11),   # Yellow
+                QtGui.QColor(236, 72, 153),   # Pink
+            ]
             color = colors[len(self.series) % len(colors)]
         self.series[name] = (data, color)
         self.update()
@@ -156,19 +179,42 @@ class LineChart(SimpleChart):
         """Clear all series"""
         self.series.clear()
         self.update()
+    
+    def setAxisLabels(self, x_label=None, y_label=None):
+        """Set axis labels for chart (optional)"""
+        if x_label is not None:
+            self.x_label = x_label
+        if y_label is not None:
+            self.y_label = y_label
+        self.update()
         
     def paintEvent(self, event):
         super().paintEvent(event)
         
-        if not self.series:
-            return
-            
         painter = QtGui.QPainter(self)
         painter.setRenderHint(QtGui.QPainter.Antialiasing)
         
-        # Calculate bounds
-        margin = 30
-        rect = self.rect().adjusted(margin, margin, -margin, -margin)
+        # Clear background with subtle gradient
+        gradient = QtGui.QLinearGradient(0, 0, 0, self.rect().height())
+        gradient.setColorAt(0, QtGui.QColor(255, 255, 255))
+        gradient.setColorAt(1, QtGui.QColor(248, 250, 252))
+        painter.fillRect(self.rect(), gradient)
+        
+        if not self.series:
+            # Draw empty state
+            painter.setPen(QtGui.QPen(QtGui.QColor(156, 163, 175), 1))
+            font = painter.font()
+            font.setPointSize(12)
+            painter.setFont(font)
+            painter.drawText(self.rect(), Qt.AlignCenter, "No data available")
+            return
+            
+        # Calculate bounds with proper padding to prevent clipping
+        left_margin = 60   # Extra space for Y-axis labels
+        top_margin = 20    # Space at top
+        right_margin = 20  # Space at right
+        bottom_margin = 40 # Space for X-axis labels
+        rect = self.rect().adjusted(left_margin, top_margin, -right_margin, -bottom_margin)
         
         # Find data bounds
         all_data = []
@@ -182,38 +228,121 @@ class LineChart(SimpleChart):
         max_val = max(all_data)
         val_range = max_val - min_val if max_val != min_val else 1
         
-        # Draw grid
+        # Add some padding to the value range
+        padding = val_range * 0.1
+        min_val -= padding
+        max_val += padding
+        val_range = max_val - min_val
+        
+        # Draw grid with better styling
         if self.show_grid:
-            painter.setPen(QtGui.QPen(QtGui.QColor(230, 230, 230), 1))
-            for i in range(5):
-                y = int(rect.top() + (i / 4) * rect.height())
+            painter.setPen(QtGui.QPen(QtGui.QColor(229, 231, 235), 1))
+            for i in range(6):  # More grid lines
+                y = int(rect.top() + (i / 5) * rect.height())
                 painter.drawLine(rect.left(), y, rect.right(), y)
                 
-        # Draw series
-        for name, (data, color) in self.series.items():
+                # Draw Y-axis labels
+                value = max_val - (i / 5) * val_range
+                painter.setPen(QtGui.QPen(QtGui.QColor(107, 114, 128), 1))
+                font = painter.font()
+                font.setPointSize(10)
+                painter.setFont(font)
+                painter.drawText(QtCore.QRectF(5, y - 8, left_margin - 10, 16), 
+                                Qt.AlignRight | Qt.AlignVCenter, f"{value:.1f}")
+                painter.setPen(QtGui.QPen(QtGui.QColor(229, 231, 235), 1))
+                
+        # Draw series with area fill and enhanced styling
+        for idx, (name, (data, color)) in enumerate(self.series.items()):
             if len(data) < 2:
                 continue
-                
-            painter.setPen(QtGui.QPen(color, 2))
             
             points = []
             for i, val in enumerate(data):
                 x = rect.left() + (i / (len(data) - 1)) * rect.width()
                 y = rect.bottom() - ((val - min_val) / val_range) * rect.height()
                 points.append(QtCore.QPointF(x, y))
-                
-            # Draw line
+            
             if len(points) > 1:
-                path = QtGui.QPainterPath()
-                path.moveTo(points[0])
-                for point in points[1:]:
-                    path.lineTo(point)
-                painter.drawPath(path)
+                # Create area fill with gradient
+                area_path = QtGui.QPainterPath()
+                area_path.moveTo(rect.left(), rect.bottom())
+                for point in points:
+                    area_path.lineTo(point)
+                area_path.lineTo(rect.right(), rect.bottom())
+                area_path.closeSubpath()
                 
-        # Draw axes
-        painter.setPen(QtGui.QPen(QtGui.QColor(100, 100, 100), 1))
+                # Area gradient
+                area_gradient = QtGui.QLinearGradient(0, rect.top(), 0, rect.bottom())
+                area_color = QtGui.QColor(color)
+                area_color.setAlpha(30)
+                area_gradient.setColorAt(0, area_color)
+                area_color.setAlpha(5)
+                area_gradient.setColorAt(1, area_color)
+                painter.fillPath(area_path, area_gradient)
+                
+                # Draw main line with thicker stroke
+                painter.setPen(QtGui.QPen(color, 3))
+                line_path = QtGui.QPainterPath()
+                line_path.moveTo(points[0])
+                for point in points[1:]:
+                    line_path.lineTo(point)
+                painter.drawPath(line_path)
+                
+                # Draw data points
+                painter.setPen(QtGui.QPen(QtGui.QColor(255, 255, 255), 2))
+                painter.setBrush(QtGui.QBrush(color))
+                for point in points[::max(1, len(points)//10)]:  # Show every 10th point
+                    painter.drawEllipse(point, 4, 4)
+                
+        # Draw enhanced axes
+        painter.setPen(QtGui.QPen(QtGui.QColor(107, 114, 128), 2))
         painter.drawLine(rect.bottomLeft(), rect.bottomRight())
         painter.drawLine(rect.bottomLeft(), rect.topLeft())
+        
+        # Enhanced axis labels
+        if self.x_label:
+            painter.setPen(QtGui.QPen(QtGui.QColor(75, 85, 99), 1))
+            font = painter.font()
+            font.setPointSize(11)
+            font.setBold(True)
+            painter.setFont(font)
+            painter.drawText(QtCore.QRectF(rect.left(), self.rect().bottom() - 25, rect.width(), 20),
+                             Qt.AlignCenter, self.x_label)
+        
+        if self.y_label:
+            painter.save()
+            painter.translate(15, rect.center().y())
+            painter.rotate(-90)
+            painter.setPen(QtGui.QPen(QtGui.QColor(75, 85, 99), 1))
+            font = painter.font()
+            font.setPointSize(11)
+            font.setBold(True)
+            painter.setFont(font)
+            painter.drawText(QtCore.QRectF(-rect.height() / 2, -10, rect.height(), 20), 
+                            Qt.AlignCenter, self.y_label)
+            painter.restore()
+            
+        # Draw legend if multiple series (positioned safely within bounds)
+        if len(self.series) > 1:
+            legend_y = rect.top() + 10
+            legend_x = rect.right() - 140
+            
+            painter.setPen(QtGui.QPen(QtGui.QColor(107, 114, 128), 1))
+            font = painter.font()
+            font.setPointSize(9)
+            painter.setFont(font)
+            
+            for idx, (name, (data, color)) in enumerate(self.series.items()):
+                y_pos = legend_y + idx * 18
+                
+                # Legend color box
+                painter.fillRect(legend_x, y_pos, 10, 10, color)
+                painter.setPen(QtGui.QPen(QtGui.QColor(229, 231, 235), 1))
+                painter.drawRect(legend_x, y_pos, 10, 10)
+                
+                # Legend text
+                painter.setPen(QtGui.QPen(QtGui.QColor(107, 114, 128), 1))
+                painter.drawText(legend_x + 16, y_pos + 8, name)
 
 
 class HeatmapChart(SimpleChart):
@@ -349,7 +478,7 @@ class GaugeChart(SimpleChart):
 
 
 class KPITile(QtWidgets.QWidget):
-    """KPI tile with value, trend, and sparkline"""
+    """Modern KPI tile with value, trend, and sparkline"""
     
     def __init__(self, title, value="--", unit="", parent=None):
         super().__init__(parent)
@@ -361,52 +490,79 @@ class KPITile(QtWidgets.QWidget):
         self.setupUI()
         
     def setupUI(self):
-        """Setup the tile UI"""
-        self.setFixedSize(200, 120)
+        """Setup the modern tile UI"""
+        self.setFixedSize(240, 140)
         self.setStyleSheet("""
             KPITile {
                 background-color: white;
-                border: 1px solid #e0e0e0;
-                border-radius: 4px;
+                border: 1px solid #e2e8f0;
+                border-radius: 12px;
+                padding: 16px;
             }
             KPITile:hover {
-                border-color: #495057;
+                border-color: #3b82f6;
+                box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
             }
         """)
         
         layout = QtWidgets.QVBoxLayout(self)
-        layout.setContentsMargins(10, 8, 10, 8)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(8)
         
         # Title
         title_label = QtWidgets.QLabel(self.title)
-        title_label.setStyleSheet("font-size: 11px; color: #666; font-weight: bold;")
+        title_label.setStyleSheet("""
+            font-size: 13px; 
+            color: #64748b; 
+            font-weight: 600;
+            margin-bottom: 4px;
+        """)
         layout.addWidget(title_label)
         
-        # Value and unit
+        # Value and unit container
         value_container = QtWidgets.QHBoxLayout()
+        value_container.setSpacing(6)
         
         self.value_label = QtWidgets.QLabel(str(self.value))
-        self.value_label.setStyleSheet("font-size: 24px; font-weight: bold; color: #495057;")
+        self.value_label.setStyleSheet("""
+            font-size: 28px; 
+            font-weight: 700; 
+            color: #1e293b;
+            line-height: 1;
+        """)
         value_container.addWidget(self.value_label)
         
         self.unit_label = QtWidgets.QLabel(self.unit)
-        self.unit_label.setStyleSheet("font-size: 12px; color: #666; margin-left: 4px;")
+        self.unit_label.setStyleSheet("""
+            font-size: 14px; 
+            color: #64748b; 
+            font-weight: 500;
+            margin-top: 8px;
+        """)
         value_container.addWidget(self.unit_label)
         
         value_container.addStretch()
         layout.addLayout(value_container)
         
+        layout.addStretch()
+        
         # Delta and sparkline
         bottom_container = QtWidgets.QHBoxLayout()
+        bottom_container.setSpacing(8)
         
         self.delta_label = QtWidgets.QLabel("")
-        self.delta_label.setStyleSheet("font-size: 10px;")
+        self.delta_label.setStyleSheet("""
+            font-size: 12px;
+            font-weight: 600;
+            padding: 2px 6px;
+            border-radius: 4px;
+        """)
         bottom_container.addWidget(self.delta_label)
         
         bottom_container.addStretch()
         
         self.sparkline = SparklineChart()
-        self.sparkline.setFixedSize(60, 20)
+        self.sparkline.setFixedSize(70, 24)
         bottom_container.addWidget(self.sparkline)
         
         layout.addLayout(bottom_container)
@@ -416,13 +572,27 @@ class KPITile(QtWidgets.QWidget):
         self.value = value
         self.value_label.setText(str(value))
         
-        # Update delta
+        # Update delta with modern styling
         if delta is not None:
             self.delta = delta
-            delta_text = f"{'▲' if delta > 0 else '▼'} {abs(delta):.1f}"
-            color = "#495057" if delta > 0 else "#6c757d"
+            if delta > 0:
+                delta_text = f"↗ +{abs(delta):.1f}"
+                bg_color = "#dcfce7"  # Light green
+                text_color = "#166534"  # Dark green
+            else:
+                delta_text = f"↘ -{abs(delta):.1f}"
+                bg_color = "#fef2f2"  # Light red
+                text_color = "#dc2626"  # Dark red
+                
             self.delta_label.setText(delta_text)
-            self.delta_label.setStyleSheet(f"font-size: 10px; color: {color};")
+            self.delta_label.setStyleSheet(f"""
+                font-size: 12px;
+                font-weight: 600;
+                padding: 2px 6px;
+                border-radius: 4px;
+                background-color: {bg_color};
+                color: {text_color};
+            """)
         
         # Update sparkline
         if trend_data:
@@ -431,7 +601,12 @@ class KPITile(QtWidgets.QWidget):
             
     def setValueColor(self, color):
         """Set value label color based on threshold"""
-        self.value_label.setStyleSheet(f"font-size: 24px; font-weight: bold; color: {color};")
+        self.value_label.setStyleSheet(f"""
+            font-size: 28px; 
+            font-weight: 700; 
+            color: {color};
+            line-height: 1;
+        """)
 
 
 def generateMockData():
