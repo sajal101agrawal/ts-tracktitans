@@ -21,16 +21,23 @@
 from Qt import QtCore, QtWidgets, Qt, QtGui, QtWebEngineWidgets, WEB_ENGINE_AVAILABLE
 import json
 import os
+from ts2.utils import settings
 
 
 class NavigationButton(QtWidgets.QPushButton):
     """Custom navigation button for sidebar"""
     
-    def __init__(self, text, icon_name=None, parent=None):
+    def __init__(self, text, icon_type=None, parent=None):
         super().__init__(text, parent)
         self.setCheckable(True)
         self.setFixedHeight(45)
-        self.setText(text)
+        self.original_text = text
+        self.icon_type = icon_type
+        self.collapsed = False
+        
+        # Set up icon if provided
+        if icon_type:
+            self.setupIcon(icon_type)
         
         # Style the button with minimal colors
         self.setStyleSheet("""
@@ -52,6 +59,73 @@ class NavigationButton(QtWidgets.QPushButton):
                 border-left: 4px solid #343a40;
             }
         """)
+        
+    def setupIcon(self, icon_type):
+        """Setup the icon based on type"""
+        # Use Qt's built-in standard pixmaps for consistent icons
+        style = self.style()
+        icon_map = {
+            'simulation': QtWidgets.QStyle.SP_ComputerIcon,
+            'map': QtWidgets.QStyle.SP_DirHomeIcon,
+            'status': QtWidgets.QStyle.SP_DialogOkButton,
+            'analysis': QtWidgets.QStyle.SP_FileDialogDetailedView,
+            'dashboard': QtWidgets.QStyle.SP_FileDialogListView,
+            'logs': QtWidgets.QStyle.SP_FileDialogNewFolder
+        }
+        
+        if icon_type in icon_map:
+            pixmap = style.standardPixmap(icon_map[icon_type])
+            icon = QtGui.QIcon(pixmap)
+            self.setIcon(icon)
+            self.setIconSize(QtCore.QSize(16, 16))
+        
+    def setCollapsed(self, collapsed):
+        """Set the button to collapsed (icon-only) or expanded (text) state"""
+        self.collapsed = collapsed
+        if collapsed:
+            self.setText("")  # Hide text, show only icon
+            self.setToolTip(self.original_text)
+            self.setStyleSheet("""
+                NavigationButton {
+                    background-color: transparent;
+                    border: none;
+                    text-align: center;
+                    padding: 0px;
+                    color: #495057;
+                    font-size: 16px;
+                    font-weight: 500;
+                }
+                NavigationButton:hover {
+                    background-color: #e9ecef;
+                }
+                NavigationButton:checked {
+                    background-color: #495057;
+                    color: white;
+                    border-left: 4px solid #343a40;
+                }
+            """)
+        else:
+            self.setText(self.original_text)  # Show text with icon
+            self.setToolTip("")
+            self.setStyleSheet("""
+                NavigationButton {
+                    background-color: transparent;
+                    border: none;
+                    text-align: left;
+                    padding-left: 15px;
+                    color: #495057;
+                    font-size: 14px;
+                    font-weight: 500;
+                }
+                NavigationButton:hover {
+                    background-color: #e9ecef;
+                }
+                NavigationButton:checked {
+                    background-color: #495057;
+                    color: white;
+                    border-left: 4px solid #343a40;
+                }
+            """)
 
 
 class SidebarNavigation(QtWidgets.QWidget):
@@ -62,11 +136,27 @@ class SidebarNavigation(QtWidgets.QWidget):
     
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.expanded_width = 250
+        self.collapsed_width = 60
+        self.nav_buttons = []
+        
+        # Load collapsed state from settings
+        self.collapsed = settings.value("sidebar_collapsed", False, type=bool)
+        
         self.setupUI()
+        
+        # Apply initial state after UI is set up
+        if self.collapsed:
+            self.setFixedWidth(self.collapsed_width)
+            self.toggle_btn.setText("▶")
+            self.updateCollapsedState()
+        else:
+            self.setFixedWidth(self.expanded_width)
+            self.toggle_btn.setText("◀")
         
     def setupUI(self):
         """Setup the sidebar UI"""
-        self.setFixedWidth(250)
+        # Width will be set in __init__ after setupUI completes
         self.setStyleSheet("""
             SidebarNavigation {
                 background-color: #f8f9fa;
@@ -79,7 +169,7 @@ class SidebarNavigation(QtWidgets.QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         
-        # Header
+        # Header with toggle button
         header = QtWidgets.QWidget()
         header.setStyleSheet("""
             background-color: #343a40;
@@ -88,14 +178,45 @@ class SidebarNavigation(QtWidgets.QWidget):
         """)
         header.setFixedHeight(80)
         
-        header_layout = QtWidgets.QVBoxLayout(header)
+        header_layout = QtWidgets.QHBoxLayout(header)
         header_layout.setContentsMargins(5, 8, 5, 8)
         header_layout.setSpacing(4)
         
-        title_label = QtWidgets.QLabel("TrackTitans")
-        title_label.setStyleSheet("font-size: 18px; font-weight: bold; color: white;")
-        title_label.setAlignment(Qt.AlignCenter)
-        header_layout.addWidget(title_label)
+        # Left side - Title (initially visible)
+        left_container = QtWidgets.QWidget()
+        left_layout = QtWidgets.QVBoxLayout(left_container)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(4)
+        
+        self.title_label = QtWidgets.QLabel("TrackTitans")
+        self.title_label.setStyleSheet("font-size: 18px; font-weight: bold; color: white;")
+        self.title_label.setAlignment(Qt.AlignCenter)
+        left_layout.addWidget(self.title_label)
+        
+        header_layout.addWidget(left_container)
+        
+        # Right side - Toggle button
+        self.toggle_btn = QtWidgets.QPushButton("◀")
+        self.toggle_btn.setFixedSize(30, 30)
+        self.toggle_btn.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                border: 1px solid #6c757d;
+                border-radius: 15px;
+                color: white;
+                font-size: 12px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: rgba(255, 255, 255, 0.1);
+                border-color: #adb5bd;
+            }
+            QPushButton:pressed {
+                background-color: rgba(255, 255, 255, 0.2);
+            }
+        """)
+        self.toggle_btn.clicked.connect(self.toggleCollapsed)
+        header_layout.addWidget(self.toggle_btn)
         
         layout.addWidget(header)
         
@@ -108,20 +229,21 @@ class SidebarNavigation(QtWidgets.QWidget):
         nav_layout.setContentsMargins(0, 10, 0, 0)
         nav_layout.setSpacing(2)
         
-        # Define navigation items
+        # Define navigation items with proper Qt icons
         nav_items = [
-            ("simulation", "Section view"),
-            ("map_overview", "Map Overview"),
-            ("system_status", "System Status"), 
-            ("whatif_analysis", "What-If Analysis"),
-            ("kpi_dashboard", "KPI Dashboard"),
-            ("audit_logs", "Audit Logs")
+            ("simulation", "Section view", "simulation"),
+            ("map_overview", "Map Overview", "map"),
+            ("system_status", "System Status", "status"), 
+            ("whatif_analysis", "What-If Analysis", "analysis"),
+            ("kpi_dashboard", "KPI Dashboard", "dashboard"),
+            ("audit_logs", "Audit Logs", "logs")
         ]
         
-        for view_name, display_text in nav_items:
-            button = NavigationButton(display_text)
+        for view_name, display_text, icon_type in nav_items:
+            button = NavigationButton(display_text, icon_type)
             button.clicked.connect(lambda checked, name=view_name: self.onButtonClicked(name))
             self.button_group.addButton(button)
+            self.nav_buttons.append(button)
             nav_layout.addWidget(button)
             
         # Set simulation as default active
@@ -131,29 +253,88 @@ class SidebarNavigation(QtWidgets.QWidget):
         layout.addWidget(nav_container)
         
         # Status indicator at bottom
-        status_widget = QtWidgets.QWidget()
-        status_widget.setFixedHeight(40)
-        status_widget.setStyleSheet("background-color: #e9ecef; border-top: 1px solid #dee2e6;")
+        self.status_widget = QtWidgets.QWidget()
+        self.status_widget.setFixedHeight(40)
+        self.status_widget.setStyleSheet("background-color: #e9ecef; border-top: 1px solid #dee2e6;")
         
-        status_layout = QtWidgets.QHBoxLayout(status_widget)
+        self.status_layout = QtWidgets.QHBoxLayout(self.status_widget)
         
         self.connection_status = QtWidgets.QLabel("● Connected")
         self.connection_status.setStyleSheet("color: #28a745; font-size: 12px;")
-        status_layout.addWidget(self.connection_status)
+        self.status_layout.addWidget(self.connection_status)
         
-        layout.addWidget(status_widget)
+        layout.addWidget(self.status_widget)
         
     def onButtonClicked(self, view_name):
         """Handle navigation button clicks"""
         self.viewChanged.emit(view_name)
         
+    def toggleCollapsed(self):
+        """Toggle the sidebar between collapsed and expanded states"""
+        self.collapsed = not self.collapsed
+        
+        # Save state to settings
+        settings.setValue("sidebar_collapsed", self.collapsed)
+        
+        if self.collapsed:
+            # Collapsing - set to collapsed width
+            self.setFixedWidth(self.collapsed_width)
+            self.toggle_btn.setText("▶")
+            self.updateCollapsedState()
+        else:
+            # Expanding - set to expanded width
+            self.setFixedWidth(self.expanded_width)
+            self.toggle_btn.setText("◀")
+            self.updateExpandedState()
+            
+    def updateCollapsedState(self):
+        """Update UI for collapsed state"""
+        # Hide title text, only show toggle button
+        self.title_label.setVisible(False)
+        
+        # Update all navigation buttons to icon-only mode
+        for button in self.nav_buttons:
+            button.setCollapsed(True)
+            
+        # Hide connection status text in collapsed mode
+        self.connection_status.setText("●")
+        self.connection_status.setToolTip("Connection Status")
+        
+    def updateExpandedState(self):
+        """Update UI for expanded state"""
+        # Show title text
+        self.title_label.setVisible(True)
+        
+        # Update all navigation buttons to text mode
+        for button in self.nav_buttons:
+            button.setCollapsed(False)
+            
+        # Show full connection status
+        self.connection_status.setToolTip("")
+        # Restore the connection text based on current status
+        current_style = self.connection_status.styleSheet()
+        if "#28a745" in current_style:
+            self.connection_status.setText("● Connected")
+        else:
+            self.connection_status.setText("● Disconnected")
+        
     def setConnectionStatus(self, connected):
         """Update connection status indicator"""
         if connected:
-            self.connection_status.setText("● Connected")
+            if self.collapsed:
+                self.connection_status.setText("●")
+                self.connection_status.setToolTip("Connected")
+            else:
+                self.connection_status.setText("● Connected")
+                self.connection_status.setToolTip("")
             self.connection_status.setStyleSheet("color: #28a745; font-size: 12px;")
         else:
-            self.connection_status.setText("● Disconnected")
+            if self.collapsed:
+                self.connection_status.setText("●")
+                self.connection_status.setToolTip("Disconnected")
+            else:
+                self.connection_status.setText("● Disconnected")
+                self.connection_status.setToolTip("")
             self.connection_status.setStyleSheet("color: #dc3545; font-size: 12px;")
 
 
@@ -168,31 +349,140 @@ class MapOverviewWidget(QtWidgets.QWidget):
         self.setupUI()
         
     def setupUI(self):
-        """Setup map overview UI - embedded Leaflet map (lightweight)"""
+        """Setup map overview UI with tabbed interface for different maps"""
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
+        layout.setSpacing(5)
 
         if WEB_ENGINE_AVAILABLE:
+            # Check Qt WebEngine version
             try:
+                from Qt import QtWebEngineCore
+                print(f"Qt WebEngine version: {QtWebEngineCore.qWebEngineVersion()}")
+            except:
+                print("Could not determine Qt WebEngine version")
+                
+            try:
+                # Create tab widget for different map types
+                self.tab_widget = QtWidgets.QTabWidget()
+                self.tab_widget.setStyleSheet("""
+                    QTabWidget::pane {
+                        border: 1px solid #c0c0c0;
+                        background-color: white;
+                    }
+                    QTabBar::tab {
+                        background-color: #f0f0f0;
+                        border: 1px solid #c0c0c0;
+                        padding: 8px 16px;
+                        margin-right: 2px;
+                    }
+                    QTabBar::tab:selected {
+                        background-color: white;
+                        border-bottom-color: white;
+                    }
+                    QTabBar::tab:hover:!selected {
+                        background-color: #e0e0e0;
+                    }
+                """)
+                
+                # Create a custom profile to avoid database conflicts
+                import tempfile
+                import os
+                
+                self.profile = QtWebEngineWidgets.QWebEngineProfile(f"ts2_map_profile_{os.getpid()}")
+                
+                # Set a unique cache directory to prevent SQLite locking issues
+                cache_dir = os.path.join(tempfile.gettempdir(), f"ts2_webengine_{os.getpid()}")
+                self.profile.setCachePath(cache_dir)
+                self.profile.setPersistentStoragePath(cache_dir)
+                
+                # Create web page with the profile
+                page = QtWebEngineWidgets.QWebEnginePage(self.profile)
                 self.map_view = QtWebEngineWidgets.QWebEngineView()
+                self.map_view.setPage(page)
                 self.map_view.setContextMenuPolicy(Qt.NoContextMenu)
 
-                # Tweak settings for stability
+                # Tweak settings for stability and to prevent database conflicts
                 settings = self.map_view.settings()
                 try:
                     settings.setAttribute(QtWebEngineWidgets.QWebEngineSettings.JavascriptEnabled, True)
-                    settings.setAttribute(QtWebEngineWidgets.QWebEngineSettings.LocalStorageEnabled, True)
-                    # Disable WebGL to avoid potential GPU-related crashes
-                    settings.setAttribute(QtWebEngineWidgets.QWebEngineSettings.WebGLEnabled, False)
+                    settings.setAttribute(QtWebEngineWidgets.QWebEngineSettings.LocalStorageEnabled, False)  # Disable to prevent DB conflicts
+                    settings.setAttribute(QtWebEngineWidgets.QWebEngineSettings.WebGLEnabled, False)  # Disable WebGL
+                    settings.setAttribute(QtWebEngineWidgets.QWebEngineSettings.WebSecurityEnabled, False)
                 except Exception:
                     pass
 
-                # Load a very small Leaflet app that overlays OpenRailwayMap tiles
-                self.map_view.setHtml(self.generateLeafletHtml(), QtCore.QUrl("https://local.map/"))
-                layout.addWidget(self.map_view)
+                # Create separate profile for Railway map to avoid conflicts
+                self.railway_profile = QtWebEngineWidgets.QWebEngineProfile(f"ts2_railway_profile_{os.getpid()}")
+                railway_cache_dir = os.path.join(tempfile.gettempdir(), f"ts2_railway_{os.getpid()}")
+                self.railway_profile.setCachePath(railway_cache_dir)
+                self.railway_profile.setPersistentStoragePath(railway_cache_dir)
+                
+                # Create second web view for Railway map with its own profile
+                railway_page = QtWebEngineWidgets.QWebEnginePage(self.railway_profile)
+                self.railway_map_view = QtWebEngineWidgets.QWebEngineView()
+                self.railway_map_view.setPage(railway_page)
+                self.railway_map_view.setContextMenuPolicy(Qt.NoContextMenu)
+                
+                # Apply all necessary settings for external site compatibility
+                railway_settings = self.railway_map_view.settings()
+                try:
+                    # Essential settings
+                    railway_settings.setAttribute(QtWebEngineWidgets.QWebEngineSettings.JavascriptEnabled, True)
+                    railway_settings.setAttribute(QtWebEngineWidgets.QWebEngineSettings.LocalStorageEnabled, True)
+                    railway_settings.setAttribute(QtWebEngineWidgets.QWebEngineSettings.WebGLEnabled, True)
+                    railway_settings.setAttribute(QtWebEngineWidgets.QWebEngineSettings.PluginsEnabled, True)
+                    
+                    # Additional settings for compatibility
+                    railway_settings.setAttribute(QtWebEngineWidgets.QWebEngineSettings.AutoLoadImages, True)
+                    railway_settings.setAttribute(QtWebEngineWidgets.QWebEngineSettings.JavascriptCanAccessClipboard, True)
+                    railway_settings.setAttribute(QtWebEngineWidgets.QWebEngineSettings.LinksIncludedInFocusChain, True)
+                    railway_settings.setAttribute(QtWebEngineWidgets.QWebEngineSettings.LocalContentCanAccessRemoteUrls, True)
+                    railway_settings.setAttribute(QtWebEngineWidgets.QWebEngineSettings.LocalContentCanAccessFileUrls, False)
+                    railway_settings.setAttribute(QtWebEngineWidgets.QWebEngineSettings.XSSAuditingEnabled, False)
+                    railway_settings.setAttribute(QtWebEngineWidgets.QWebEngineSettings.SpatialNavigationEnabled, False)
+                    railway_settings.setAttribute(QtWebEngineWidgets.QWebEngineSettings.HyperlinkAuditingEnabled, False)
+                    railway_settings.setAttribute(QtWebEngineWidgets.QWebEngineSettings.ScrollAnimatorEnabled, True)
+                    railway_settings.setAttribute(QtWebEngineWidgets.QWebEngineSettings.ErrorPageEnabled, True)
+                    railway_settings.setAttribute(QtWebEngineWidgets.QWebEngineSettings.FullScreenSupportEnabled, True)
+                    railway_settings.setAttribute(QtWebEngineWidgets.QWebEngineSettings.ScreenCaptureEnabled, False)
+                    railway_settings.setAttribute(QtWebEngineWidgets.QWebEngineSettings.WebGLEnabled, True)
+                    railway_settings.setAttribute(QtWebEngineWidgets.QWebEngineSettings.Accelerated2dCanvasEnabled, True)
+                    railway_settings.setAttribute(QtWebEngineWidgets.QWebEngineSettings.AutoLoadIconsForPage, True)
+                    railway_settings.setAttribute(QtWebEngineWidgets.QWebEngineSettings.TouchIconsEnabled, True)
+                    railway_settings.setAttribute(QtWebEngineWidgets.QWebEngineSettings.FocusOnNavigationEnabled, True)
+                    railway_settings.setAttribute(QtWebEngineWidgets.QWebEngineSettings.PrintElementBackgrounds, True)
+                    railway_settings.setAttribute(QtWebEngineWidgets.QWebEngineSettings.AllowRunningInsecureContent, False)
+                    railway_settings.setAttribute(QtWebEngineWidgets.QWebEngineSettings.AllowGeolocationOnInsecureOrigins, False)
+                    railway_settings.setAttribute(QtWebEngineWidgets.QWebEngineSettings.JavascriptCanOpenWindows, False)
+                    railway_settings.setAttribute(QtWebEngineWidgets.QWebEngineSettings.JavascriptCanPaste, True)
+                    railway_settings.setAttribute(QtWebEngineWidgets.QWebEngineSettings.WebRTCPublicInterfacesOnly, False)
+                    
+                    # Set default font sizes
+                    railway_settings.setFontSize(QtWebEngineWidgets.QWebEngineSettings.MinimumFontSize, 8)
+                    railway_settings.setFontSize(QtWebEngineWidgets.QWebEngineSettings.DefaultFontSize, 16)
+                    railway_settings.setFontSize(QtWebEngineWidgets.QWebEngineSettings.DefaultFixedFontSize, 13)
+                except Exception as e:
+                    print(f"Warning: Some web engine settings could not be applied: {e}")
+
+                # Add map tabs
+                self.tab_widget.addTab(self.map_view, "🗺️ OpenRailwayMap")
+                self.tab_widget.addTab(self.railway_map_view, "🚂 Railway Infrastructure")
+                
+                # Connect tab change event
+                self.tab_widget.currentChanged.connect(self.onTabChanged)
+                
+                # Load default map (OpenRailwayMap)
+                self.loadOpenRailwayMap()
+                
+                # Pre-load the Railway map to check if it works
+                print("Pre-loading Railway Infrastructure Map...")
+                self.railway_map_view.setUrl(QtCore.QUrl("https://rail-map.up.railway.app/"))
+                
+                layout.addWidget(self.tab_widget)
                 return
-            except Exception:
+            except Exception as e:
+                print(f"WebEngine failed to initialize: {e}")
                 # If anything goes wrong, fall back to browser open UI
                 pass
 
@@ -260,8 +550,8 @@ class MapOverviewWidget(QtWidgets.QWidget):
         buttons_layout = QtWidgets.QVBoxLayout(buttons_widget)
         buttons_layout.setSpacing(15)
         
-        # Primary button - Open full map
-        open_btn = QtWidgets.QPushButton("🌐 Open Interactive Map")
+        # Primary button - Open OpenRailwayMap
+        open_btn = QtWidgets.QPushButton("🗺️ Open OpenRailwayMap")
         open_btn.clicked.connect(self.openOnlineMap)
         open_btn.setStyleSheet("""
             QPushButton {
@@ -276,13 +566,32 @@ class MapOverviewWidget(QtWidgets.QWidget):
             }
             QPushButton:hover {
                 background-color: #343a40;
-                transform: translateY(-1px);
             }
         """)
         buttons_layout.addWidget(open_btn, 0, Qt.AlignCenter)
         
-        # Secondary info
-        info_label = QtWidgets.QLabel("Opens OpenRailwayMap in your default browser for best performance")
+        # Secondary button - Open Railway Infrastructure Map
+        railway_btn = QtWidgets.QPushButton("🚂 Open Railway Infrastructure Map")
+        railway_btn.clicked.connect(self.openRailwayInfrastructureMap)
+        railway_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #28a745;
+                border: 1px solid #28a745;
+                border-radius: 6px;
+                padding: 15px 30px;
+                color: white;
+                font-weight: 600;
+                font-size: 16px;
+                min-height: 50px;
+            }
+            QPushButton:hover {
+                background-color: #218838;
+            }
+        """)
+        buttons_layout.addWidget(railway_btn, 0, Qt.AlignCenter)
+        
+        # Info labels
+        info_label = QtWidgets.QLabel("Opens maps in your default browser for best performance")
         info_label.setStyleSheet("font-size: 12px; color: #868e96; font-style: italic;")
         info_label.setAlignment(Qt.AlignCenter)
         buttons_layout.addWidget(info_label)
@@ -354,6 +663,191 @@ class MapOverviewWidget(QtWidgets.QWidget):
         """Open OpenRailwayMap in external browser"""
         import webbrowser
         webbrowser.open("https://openrailwaymap.app/#view=11.62/23.2703/77.403")
+        
+    def openRailwayInfrastructureMap(self):
+        """Open Railway Infrastructure Map in external browser"""
+        import webbrowser
+        webbrowser.open("https://rail-map.up.railway.app/")
+        
+    def testWebEngineCapabilities(self):
+        """Test if WebEngine can load external content properly"""
+        if hasattr(self, 'railway_map_view'):
+            test_html = """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>WebEngine Test</title>
+                <style>
+                    body { font-family: Arial, sans-serif; padding: 20px; }
+                    .status { margin: 10px 0; padding: 10px; background: #f0f0f0; }
+                </style>
+            </head>
+            <body>
+                <h1>WebEngine Capability Test</h1>
+                <div class="status">JavaScript: <span id="js-status">Checking...</span></div>
+                <div class="status">WebGL: <span id="webgl-status">Checking...</span></div>
+                <div class="status">Canvas: <span id="canvas-status">Checking...</span></div>
+                <div class="status">LocalStorage: <span id="storage-status">Checking...</span></div>
+                <div class="status">External Resources: <span id="external-status">Checking...</span></div>
+                
+                <h2>Loading External Site</h2>
+                <p>Attempting to load Railway Infrastructure Map in 3 seconds...</p>
+                
+                <script>
+                    // Test JavaScript
+                    document.getElementById('js-status').textContent = 'Working ✓';
+                    
+                    // Test WebGL
+                    try {
+                        var canvas = document.createElement('canvas');
+                        var gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+                        document.getElementById('webgl-status').textContent = gl ? 'Working ✓' : 'Not available ✗';
+                    } catch(e) {
+                        document.getElementById('webgl-status').textContent = 'Error: ' + e.message;
+                    }
+                    
+                    // Test Canvas
+                    try {
+                        var canvas2d = document.createElement('canvas').getContext('2d');
+                        document.getElementById('canvas-status').textContent = canvas2d ? 'Working ✓' : 'Not available ✗';
+                    } catch(e) {
+                        document.getElementById('canvas-status').textContent = 'Error: ' + e.message;
+                    }
+                    
+                    // Test LocalStorage
+                    try {
+                        localStorage.setItem('test', 'value');
+                        localStorage.removeItem('test');
+                        document.getElementById('storage-status').textContent = 'Working ✓';
+                    } catch(e) {
+                        document.getElementById('storage-status').textContent = 'Not available: ' + e.message;
+                    }
+                    
+                    // Test external resources
+                    fetch('https://api.github.com/rate_limit')
+                        .then(response => response.json())
+                        .then(data => {
+                            document.getElementById('external-status').textContent = 'Working ✓ (Can fetch external APIs)';
+                        })
+                        .catch(error => {
+                            document.getElementById('external-status').textContent = 'Failed: ' + error.message;
+                        });
+                    
+                    // Redirect after 3 seconds
+                    setTimeout(function() {
+                        window.location.href = 'https://rail-map.up.railway.app/';
+                    }, 3000);
+                </script>
+            </body>
+            </html>
+            """
+            self.railway_map_view.setHtml(test_html, QtCore.QUrl("https://test.local/"))
+        
+    def onTabChanged(self, index):
+        """Handle tab change events"""
+        if not hasattr(self, 'tab_widget'):
+            return
+            
+        if index == 0:  # OpenRailwayMap tab
+            self.loadOpenRailwayMap()
+        elif index == 1:  # Railway Infrastructure tab
+            # Run capability test first (comment this out after testing)
+            # self.testWebEngineCapabilities()
+            # Load the actual map
+            self.loadRailwayInfrastructureMap()
+            
+    def loadOpenRailwayMap(self):
+        """Load the OpenRailwayMap using Leaflet"""
+        if hasattr(self, 'map_view'):
+            self.map_view.setHtml(self.generateLeafletHtml(), QtCore.QUrl("https://local.map/"))
+            
+    def loadRailwayInfrastructureMap(self):
+        """Load the Railway Infrastructure Map"""
+        if hasattr(self, 'railway_map_view'):
+            # Disconnect any existing handlers
+            try:
+                self.railway_map_view.loadFinished.disconnect()
+                self.railway_map_view.loadProgress.disconnect()
+                self.railway_map_view.loadStarted.disconnect()
+            except:
+                pass
+            
+            # Set a desktop user agent
+            profile = self.railway_map_view.page().profile()
+            profile.setHttpUserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+            
+            # Add console message handler
+            def handle_console_message(level, message, line, sourceId):
+                level_str = ["Info", "Warning", "Error"][level]
+                print(f"Railway Map Console [{level_str}]: {message} (line {line}, source: {sourceId})")
+            
+            # Set console message handler
+            page = self.railway_map_view.page()
+            page.javaScriptConsoleMessage.connect(handle_console_message)
+            
+            # Add certificate error handler
+            def handle_certificate_error(error):
+                print(f"Certificate Error: {error.url().toString()}")
+                error.ignoreCertificateError()
+                return True
+            
+            page.certificateError.connect(handle_certificate_error)
+            
+            # Add feature permission handler
+            def handle_feature_permission(url, feature):
+                print(f"Feature permission requested: {feature} for {url.toString()}")
+                page.setFeaturePermission(url, feature, QtWebEngineWidgets.QWebEnginePage.PermissionGrantedByUser)
+            
+            page.featurePermissionRequested.connect(handle_feature_permission)
+            
+            # Add navigation handler
+            def handle_url_changed(url):
+                print(f"URL changed to: {url.toString()}")
+            
+            self.railway_map_view.urlChanged.connect(handle_url_changed)
+            
+            # Add load progress handler
+            def on_load_progress(progress):
+                print(f"Railway Map loading progress: {progress}%")
+            
+            self.railway_map_view.loadProgress.connect(on_load_progress)
+            
+            # Add load started handler
+            def on_load_started():
+                print("Railway Map loading started...")
+            
+            self.railway_map_view.loadStarted.connect(on_load_started)
+            
+            # Add load finished handler with more debugging
+            def on_load_finished(success):
+                if success:
+                    print("Railway Infrastructure Map loaded successfully")
+                    # Check the actual content
+                    page.runJavaScript("""
+                        JSON.stringify({
+                            title: document.title,
+                            bodyText: document.body ? document.body.innerText.substring(0, 200) : 'no body',
+                            hasCanvas: document.getElementsByTagName('canvas').length,
+                            hasScripts: document.getElementsByTagName('script').length,
+                            readyState: document.readyState,
+                            url: window.location.href
+                        })
+                    """, lambda result: print(f"Page info: {result}"))
+                else:
+                    print("Railway Infrastructure Map failed to load")
+                    # Get error details
+                    page.runJavaScript("document.documentElement.outerHTML", 
+                        lambda html: print(f"HTML content: {html[:500]}..." if html else "No HTML content"))
+            
+            self.railway_map_view.loadFinished.connect(on_load_finished)
+            
+            # Clear cache before loading
+            profile.clearHttpCache()
+            
+            # Load the URL
+            url = QtCore.QUrl("https://rail-map.up.railway.app/")
+            print(f"Loading Railway Infrastructure Map from: {url.toString()}")
+            self.railway_map_view.load(url)
 
 
 class TrainManagementWidget(QtWidgets.QWidget):
@@ -386,8 +880,7 @@ class TrainManagementWidget(QtWidgets.QWidget):
         trains_label.setStyleSheet("font-size: 16px; font-weight: bold; color: #495057; margin-bottom: 10px;")
         left_layout.addWidget(trains_label)
         
-        self.trains_table = QtWidgets.QTableWidget()
-        self.trains_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+        self.trains_table = self._create_enhanced_table()
         self.trains_table.selectionModel().selectionChanged.connect(self.onTrainSelected)
         # Ensure table expands within its panel
         self.trains_table.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
@@ -439,6 +932,99 @@ class TrainManagementWidget(QtWidgets.QWidget):
         layout.setStretch(0, 1)  # Left panel gets some flexibility
         layout.setStretch(1, 2)  # Right panel gets more space priority
         
+    def _create_enhanced_table(self):
+        """Create an enhanced table widget for train management"""
+        table = QtWidgets.QTableWidget()
+        table.setStyleSheet("""
+            QTableWidget {
+                border: none;
+                background-color: white;
+                gridline-color: #f1f5f9;
+                font-size: 13px;
+                selection-background-color: #eff6ff;
+                border-radius: 8px;
+                border: 1px solid #e5e7eb;
+            }
+            QTableWidget::item {
+                padding: 12px 8px;
+                border-bottom: 1px solid #f1f5f9;
+                color: #1e293b;
+                font-weight: 500;
+            }
+            QTableWidget::item:selected {
+                background-color: #eff6ff;
+                color: #1e40af;
+                border: none;
+            }
+            QTableWidget::item:hover {
+                background-color: #f8fafc;
+                color: #0f172a;
+            }
+            QHeaderView {
+                border: none;
+                background-color: transparent;
+            }
+            QHeaderView::section {
+                background-color: #f8fafc;
+                padding: 12px 8px;
+                border: none;
+                border-bottom: 2px solid #e2e8f0;
+                font-weight: 600;
+                color: #475569;
+                font-size: 12px;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }
+            QHeaderView::section:horizontal {
+                border-right: 1px solid #f1f5f9;
+            }
+            QHeaderView::section:last {
+                border-right: none;
+            }
+            QTableWidget::item:alternate {
+                background-color: #f9fafb;
+            }
+            QScrollBar:vertical {
+                background: #f1f5f9;
+                width: 8px;
+                border-radius: 4px;
+                margin: 0;
+            }
+            QScrollBar::handle:vertical {
+                background: #cbd5e1;
+                border-radius: 4px;
+                min-height: 20px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background: #94a3b8;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0px;
+            }
+        """)
+        
+        # Enhanced table properties
+        table.setShowGrid(True)
+        table.setAlternatingRowColors(True)
+        table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+        table.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+        table.setVerticalScrollMode(QtWidgets.QAbstractItemView.ScrollPerPixel)
+        table.setHorizontalScrollMode(QtWidgets.QAbstractItemView.ScrollPerPixel)
+        
+        # Modern header styling
+        header = table.horizontalHeader()
+        header.setDefaultSectionSize(120)
+        header.setMinimumSectionSize(80)
+        header.setCascadingSectionResizes(False)
+        header.setHighlightSections(False)
+        header.setStretchLastSection(False)
+        
+        # Vertical header styling
+        v_header = table.verticalHeader()
+        v_header.setVisible(False)  # Hide row numbers for cleaner look
+        
+        return table
+        
     def loadDummyData(self):
         """Load dummy train data"""
         try:
@@ -452,24 +1038,78 @@ class TrainManagementWidget(QtWidgets.QWidget):
             
     @QtCore.pyqtSlot()
     def updateTrainsTable(self):
-        """Update the trains table"""
+        """Update the trains table with enhanced styling"""
         self.trains_table.setRowCount(len(self.trains_data))
         self.trains_table.setColumnCount(4)
         self.trains_table.setHorizontalHeaderLabels(["Train ID", "Status", "Speed", "Delay"])
         
         for row, train in enumerate(self.trains_data):
-            self.trains_table.setItem(row, 0, QtWidgets.QTableWidgetItem(train['id']))
-            self.trains_table.setItem(row, 1, QtWidgets.QTableWidgetItem(train['status']))
-            self.trains_table.setItem(row, 2, QtWidgets.QTableWidgetItem(f"{train['speed']} km/h"))
-            self.trains_table.setItem(row, 3, QtWidgets.QTableWidgetItem(f"{train['delay']} min"))
+            # Train ID with monospace
+            id_item = QtWidgets.QTableWidgetItem(train['id'])
+            id_item.setFont(QtGui.QFont("monospace"))
+            self.trains_table.setItem(row, 0, id_item)
             
-        # Fix right-side cropping - ensure table uses full width with proper column distribution
+            # Status with color coding
+            status_text = train['status']
+            status_item = QtWidgets.QTableWidgetItem(status_text)
+            status_item.font().setBold(True)
+            
+            if status_text.upper() in ['RUNNING', 'ON TIME', 'ACTIVE']:
+                status_item.setForeground(QtGui.QColor("#10b981"))  # Green
+                status_item.setBackground(QtGui.QColor("#ecfdf5"))
+            elif status_text.upper() in ['DELAYED', 'WARNING']:
+                status_item.setForeground(QtGui.QColor("#f59e0b"))  # Amber
+                status_item.setBackground(QtGui.QColor("#fffbeb"))
+            elif status_text.upper() in ['STOPPED', 'HALTED']:
+                status_item.setForeground(QtGui.QColor("#6b7280"))  # Gray
+            elif status_text.upper() in ['ERROR', 'EMERGENCY']:
+                status_item.setForeground(QtGui.QColor("#ef4444"))  # Red
+                status_item.setBackground(QtGui.QColor("#fef2f2"))
+            else:
+                status_item.setForeground(QtGui.QColor("#6b7280"))  # Default gray
+                
+            self.trains_table.setItem(row, 1, status_item)
+            
+            # Speed with color coding and monospace
+            speed = train.get('speed', 0)
+            speed_item = QtWidgets.QTableWidgetItem(f"{speed} km/h")
+            speed_item.setFont(QtGui.QFont("monospace"))
+            
+            if speed > 80:
+                speed_item.setForeground(QtGui.QColor("#ef4444"))  # Red for high speed
+            elif speed > 40:
+                speed_item.setForeground(QtGui.QColor("#f59e0b"))  # Amber for medium speed
+            else:
+                speed_item.setForeground(QtGui.QColor("#10b981"))  # Green for low speed
+                
+            self.trains_table.setItem(row, 2, speed_item)
+            
+            # Delay with color coding
+            delay = train.get('delay', 0)
+            delay_item = QtWidgets.QTableWidgetItem(f"{delay} min")
+            delay_item.setFont(QtGui.QFont("monospace"))
+            
+            if delay > 10:
+                delay_item.setForeground(QtGui.QColor("#ef4444"))  # Red for major delay
+                delay_item.setBackground(QtGui.QColor("#fef2f2"))
+            elif delay > 5:
+                delay_item.setForeground(QtGui.QColor("#f59e0b"))  # Amber for moderate delay
+                delay_item.setBackground(QtGui.QColor("#fffbeb"))
+            elif delay <= 0:
+                delay_item.setForeground(QtGui.QColor("#10b981"))  # Green for on time/early
+                delay_item.setBackground(QtGui.QColor("#ecfdf5"))
+            else:
+                delay_item.setForeground(QtGui.QColor("#6b7280"))  # Gray for minor delay
+                
+            self.trains_table.setItem(row, 3, delay_item)
+            
+        # Enhanced column sizing for better readability
         header = self.trains_table.horizontalHeader()
         header.setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeToContents)  # Train ID
         header.setSectionResizeMode(1, QtWidgets.QHeaderView.Stretch)  # Status (expandable)
         header.setSectionResizeMode(2, QtWidgets.QHeaderView.ResizeToContents)  # Speed
         header.setSectionResizeMode(3, QtWidgets.QHeaderView.ResizeToContents)  # Delay
-        header.setStretchLastSection(False)  # Let us control the sizing manually
+        header.setStretchLastSection(False)  # Manual control
         
     def onTrainSelected(self):
         """Handle train selection"""
@@ -541,7 +1181,7 @@ class TrainManagementWidget(QtWidgets.QWidget):
         return self._session
 
     def loadTrainsFromApi(self, section_id=None):
-        """Fetch current trains for a section from the server API."""
+        """Fetch current trains for a section from the server API with fallback to dummy data."""
         import threading
 
         def _run():
@@ -555,7 +1195,9 @@ class TrainManagementWidget(QtWidgets.QWidget):
                 self.trains_data = trains
                 QtCore.QMetaObject.invokeMethod(self, "updateTrainsTable", Qt.QueuedConnection)
             except Exception as e:
-                print(f"Error loading trains: {e}")
+                print(f"Error loading trains from API: {e}, falling back to dummy data")
+                # Fallback to dummy data
+                QtCore.QMetaObject.invokeMethod(self, "loadDummyData", Qt.QueuedConnection)
 
         threading.Thread(target=_run, daemon=True).start()
 
@@ -711,8 +1353,6 @@ class SystemStatusWidget(QtWidgets.QWidget):
         # Minimal action buttons
         actions_row = QtWidgets.QHBoxLayout()
         
-        self.change_signal_btn = QtWidgets.QPushButton("Change Signal")
-        self.maintenance_btn = QtWidgets.QPushButton("Maintenance")
         self.refresh_btn = QtWidgets.QPushButton("Refresh")
         
         # Apply minimal button styling
@@ -735,16 +1375,12 @@ class SystemStatusWidget(QtWidgets.QWidget):
             }
         """
         
-        for btn in [self.change_signal_btn, self.maintenance_btn, self.refresh_btn]:
-            btn.setStyleSheet(button_style)
+        self.refresh_btn.setStyleSheet(button_style)
         
-        actions_row.addWidget(self.change_signal_btn)
-        actions_row.addWidget(self.maintenance_btn)
         actions_row.addStretch()
         actions_row.addWidget(self.refresh_btn)
         
         self.refresh_btn.clicked.connect(self.loadOverviewFromApi)
-        self.change_signal_btn.clicked.connect(self.onChangeSignal)
             
         layout.addLayout(actions_row)
         
@@ -760,31 +1396,49 @@ class SystemStatusWidget(QtWidgets.QWidget):
         tables_layout = QtWidgets.QVBoxLayout(tables_container)
         tables_layout.setContentsMargins(0, 0, 0, 0)
         
-        # Minimal tabs
+        # Enhanced modern tabs
         self.tabs = QtWidgets.QTabWidget()
         self.tabs.setStyleSheet("""
             QTabWidget::pane {
                 border: none;
                 background-color: white;
+                border-radius: 6px;
+            }
+            QTabWidget::tab-bar {
+                alignment: left;
+            }
+            QTabBar {
+                qproperty-drawBase: 0;
+                border: none;
+                background-color: transparent;
             }
             QTabBar::tab {
-                background-color: #f9fafb;
-                color: #6b7280;
-                padding: 8px 16px;
-                margin-right: 1px;
-                border-top-left-radius: 4px;
-                border-top-right-radius: 4px;
+                background-color: #f8fafc;
+                color: #64748b;
+                padding: 12px 20px;
+                margin-right: 2px;
+                margin-bottom: 0px;
+                border-top-left-radius: 8px;
+                border-top-right-radius: 8px;
+                border-bottom: 2px solid transparent;
                 font-weight: 500;
-                font-size: 13px;
+                font-size: 14px;
+                min-width: 80px;
             }
             QTabBar::tab:selected {
                 background-color: white;
-                color: #374151;
+                color: #1e293b;
                 font-weight: 600;
+                border-bottom: 2px solid #3b82f6;
+                margin-top: 0px;
             }
             QTabBar::tab:hover:!selected {
-                background-color: #f3f4f6;
-                color: #4b5563;
+                background-color: #f1f5f9;
+                color: #475569;
+                border-bottom: 2px solid #cbd5e1;
+            }
+            QTabBar::tab:first {
+                margin-left: 8px;
             }
         """)
         
@@ -812,36 +1466,112 @@ class SystemStatusWidget(QtWidgets.QWidget):
         main_layout.addWidget(content)
         
     def _create_minimal_table(self):
-        """Create a minimal styled table widget"""
+        """Create an enhanced modern table widget"""
         table = QtWidgets.QTableWidget()
         table.setStyleSheet("""
             QTableWidget {
                 border: none;
                 background-color: white;
-                gridline-color: #f3f4f6;
-                font-size: 12px;
+                gridline-color: #f1f5f9;
+                font-size: 13px;
+                selection-background-color: #eff6ff;
+                border-radius: 6px;
             }
             QTableWidget::item {
-                padding: 6px 8px;
-                border-bottom: 1px solid #f3f4f6;
+                padding: 10px 12px;
+                border-bottom: 1px solid #f1f5f9;
+                color: #1e293b;
+                font-weight: 500;
             }
             QTableWidget::item:selected {
-                background-color: #f0f9ff;
+                background-color: #eff6ff;
                 color: #1e40af;
+                border: none;
+            }
+            QTableWidget::item:hover {
+                background-color: #f8fafc;
+                color: #0f172a;
+            }
+            QHeaderView {
+                border: none;
+                background-color: transparent;
             }
             QHeaderView::section {
-                background-color: #f9fafb;
-                padding: 8px;
+                background-color: #f8fafc;
+                padding: 12px;
                 border: none;
-                border-bottom: 1px solid #e5e7eb;
+                border-bottom: 2px solid #e2e8f0;
                 font-weight: 600;
-                color: #374151;
-                font-size: 12px;
+                color: #475569;
+                font-size: 13px;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }
+            QHeaderView::section:horizontal {
+                border-right: 1px solid #f1f5f9;
+            }
+            QHeaderView::section:last {
+                border-right: none;
             }
             QTableWidget::item:alternate {
-                background-color: #fafafa;
+                background-color: #f9fafb;
+            }
+            QScrollBar:vertical {
+                background: #f1f5f9;
+                width: 10px;
+                border-radius: 5px;
+                margin: 0;
+            }
+            QScrollBar::handle:vertical {
+                background: #cbd5e1;
+                border-radius: 5px;
+                min-height: 20px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background: #94a3b8;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0px;
+            }
+            QScrollBar:horizontal {
+                background: #f1f5f9;
+                height: 10px;
+                border-radius: 5px;
+                margin: 0;
+            }
+            QScrollBar::handle:horizontal {
+                background: #cbd5e1;
+                border-radius: 5px;
+                min-width: 20px;
+            }
+            QScrollBar::handle:horizontal:hover {
+                background: #94a3b8;
+            }
+            QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+                width: 0px;
             }
         """)
+        
+        # Enhanced table properties
+        table.setShowGrid(True)
+        table.setAlternatingRowColors(True)
+        table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+        table.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+        table.setVerticalScrollMode(QtWidgets.QAbstractItemView.ScrollPerPixel)
+        table.setHorizontalScrollMode(QtWidgets.QAbstractItemView.ScrollPerPixel)
+        
+        # Modern header styling
+        header = table.horizontalHeader()
+        header.setDefaultSectionSize(120)
+        header.setMinimumSectionSize(80)
+        header.setCascadingSectionResizes(False)
+        header.setHighlightSections(False)
+        header.setStretchLastSection(False)
+        
+        # Vertical header styling
+        v_header = table.verticalHeader()
+        v_header.setVisible(False)  # Hide row numbers for cleaner look
+        
         return table
         
     def _http(self):
@@ -866,9 +1596,67 @@ class SystemStatusWidget(QtWidgets.QWidget):
                                      or [])
                 QtCore.QMetaObject.invokeMethod(self, "updateFromOverview", Qt.QueuedConnection)
             except Exception as e:
-                print(f"Error loading overview: {e}")
+                print(f"Error loading overview from API: {e}, loading fallback demo data")
+                # Fallback to demo data structure
+                QtCore.QMetaObject.invokeMethod(self, "loadDemoSystemData", Qt.QueuedConnection)
 
         threading.Thread(target=_run, daemon=True).start()
+        
+    @QtCore.pyqtSlot()
+    def loadDemoSystemData(self):
+        """Load demo system status data when API is not available"""
+        try:
+            import os
+            data_file = os.path.join(os.path.dirname(__file__), '..', 'data', 'dummy_data.json')
+            with open(data_file, 'r') as f:
+                data = json.load(f)
+                
+                # Structure the data for system status display
+                self.overview_data = {
+                    'signals': data.get('signals', []),
+                    'tracks': [
+                        {'id': 'TRK_A1', 'type': 'MAIN', 'name': 'Central Track A1', 'place': 'Junction A', 'trackCode': 'A1', 'occupied': False},
+                        {'id': 'TRK_A2', 'type': 'MAIN', 'name': 'Central Track A2', 'place': 'Junction A', 'trackCode': 'A2', 'occupied': True},
+                        {'id': 'TRK_B1', 'type': 'PLATFORM', 'name': 'Platform Track B1', 'place': 'Station B', 'trackCode': 'B1', 'occupied': False},
+                        {'id': 'TRK_B2', 'type': 'PLATFORM', 'name': 'Platform Track B2', 'place': 'Station B', 'trackCode': 'B2', 'occupied': True},
+                        {'id': 'TRK_C1', 'type': 'FREIGHT', 'name': 'Freight Track C1', 'place': 'Yard C', 'trackCode': 'C1', 'occupied': False}
+                    ],
+                    'routes': [
+                        {'id': 'RT_001', 'beginSignal': 'SIG_A1', 'endSignal': 'SIG_B1', 'state': 'ACTIVE', 'isActive': True},
+                        {'id': 'RT_002', 'beginSignal': 'SIG_A2', 'endSignal': 'SIG_B2', 'state': 'LOCKED', 'isActive': True},
+                        {'id': 'RT_003', 'beginSignal': 'SIG_B1', 'endSignal': 'SIG_C1', 'state': 'INACTIVE', 'isActive': False}
+                    ],
+                    'trains': [
+                        {'id': 'T001', 'serviceCode': 'SVC001', 'status': 'RUNNING', 'active': True, 'speedKmh': 75.5, 'maxSpeed': 120},
+                        {'id': 'T002', 'serviceCode': 'SVC002', 'status': 'STOPPED', 'active': False, 'speedKmh': 0, 'maxSpeed': 100}
+                    ],
+                    'occupancy': {'utilization': 78.5},
+                    'totals': {
+                        'trains': {'active': 1, 'total': 2},
+                        'signals': 3,
+                        'routes': 3
+                    }
+                }
+                
+                # Extract signals data
+                self.signals_data = self.overview_data.get('signals', [])
+                
+                # Update the display
+                self.updateFromOverview()
+                
+        except Exception as e:
+            print(f"Error loading demo data: {e}")
+            # Create minimal fallback data
+            self.overview_data = {
+                'signals': [],
+                'tracks': [],
+                'routes': [],
+                'trains': [],
+                'occupancy': {'utilization': 0},
+                'totals': {'trains': {'active': 0, 'total': 0}, 'signals': 0, 'routes': 0}
+            }
+            self.signals_data = []
+            self.updateFromOverview()
             
     @QtCore.pyqtSlot()
     def updateFromOverview(self):
@@ -907,114 +1695,273 @@ class SystemStatusWidget(QtWidgets.QWidget):
 
     @QtCore.pyqtSlot()
     def updateSignalsTable(self):
-        """Update the signals table"""
+        """Update the signals table with enhanced styling"""
         self.signals_table.setRowCount(len(self.signals_data))
         self.signals_table.setColumnCount(5)
         self.signals_table.setHorizontalHeaderLabels(["Signal ID", "Name", "Status", "Type", "Last Changed"])
         
         for row, signal in enumerate(self.signals_data):
-            self.signals_table.setItem(row, 0, QtWidgets.QTableWidgetItem(signal['id']))
+            # Signal ID
+            id_item = QtWidgets.QTableWidgetItem(signal['id'])
+            id_item.setFont(QtGui.QFont("monospace"))  # Monospace for IDs
+            self.signals_table.setItem(row, 0, id_item)
+            
+            # Name
             self.signals_table.setItem(row, 1, QtWidgets.QTableWidgetItem(signal['name']))
             
-            # Status with color coding
+            # Status with modern color coding
             status_item = QtWidgets.QTableWidgetItem(signal['status'])
+            status_item.setFont(QtGui.QFont())
+            status_item.font().setBold(True)
+            
             if signal['status'] == 'GREEN':
-                status_item.setBackground(QtGui.QColor(200, 255, 200))
+                status_item.setForeground(QtGui.QColor("#10b981"))  # Modern green
+                status_item.setBackground(QtGui.QColor("#ecfdf5"))  # Light green bg
             elif signal['status'] == 'RED':
-                status_item.setBackground(QtGui.QColor(255, 200, 200))
+                status_item.setForeground(QtGui.QColor("#ef4444"))  # Modern red
+                status_item.setBackground(QtGui.QColor("#fef2f2"))  # Light red bg
             elif signal['status'] == 'YELLOW':
-                status_item.setBackground(QtGui.QColor(255, 255, 200))
+                status_item.setForeground(QtGui.QColor("#f59e0b"))  # Modern amber
+                status_item.setBackground(QtGui.QColor("#fffbeb"))  # Light amber bg
                 
             self.signals_table.setItem(row, 2, status_item)
-            self.signals_table.setItem(row, 3, QtWidgets.QTableWidgetItem(signal['type']))
-            self.signals_table.setItem(row, 4, QtWidgets.QTableWidgetItem(signal['lastChanged']))
             
-        # Fix right-side cropping - ensure table uses full width with proper column distribution
+            # Type
+            type_item = QtWidgets.QTableWidgetItem(signal['type'])
+            type_item.setForeground(QtGui.QColor("#6b7280"))  # Subtle gray
+            self.signals_table.setItem(row, 3, type_item)
+            
+            # Last Changed
+            time_item = QtWidgets.QTableWidgetItem(signal['lastChanged'])
+            time_item.setForeground(QtGui.QColor("#6b7280"))  # Subtle gray
+            time_item.setFont(QtGui.QFont("monospace"))  # Monospace for time
+            self.signals_table.setItem(row, 4, time_item)
+            
+        # Enhanced column sizing for better readability
         header = self.signals_table.horizontalHeader()
         header.setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeToContents)  # Signal ID
-        header.setSectionResizeMode(1, QtWidgets.QHeaderView.Stretch)  # Name (expandable)
+        header.setSectionResizeMode(1, QtWidgets.QHeaderView.Stretch)  # Name (expandable)  
         header.setSectionResizeMode(2, QtWidgets.QHeaderView.ResizeToContents)  # Status
         header.setSectionResizeMode(3, QtWidgets.QHeaderView.ResizeToContents)  # Type
         header.setSectionResizeMode(4, QtWidgets.QHeaderView.ResizeToContents)  # Last Changed
         header.setStretchLastSection(False)  # Manual control
+        
+        # Set minimum column widths for better layout
+        self.signals_table.setColumnWidth(0, 100)  # Signal ID
+        self.signals_table.setColumnWidth(2, 80)   # Status
+        self.signals_table.setColumnWidth(3, 100)  # Type
 
     def updateTracksTable(self, tracks):
+        """Update tracks table with enhanced styling"""
         self.tracks_table.setRowCount(len(tracks))
         self.tracks_table.setColumnCount(6)
         self.tracks_table.setHorizontalHeaderLabels(["ID", "Type", "Name", "Place", "Code", "Occupied"])
+        
         for row, t in enumerate(tracks):
-            self.tracks_table.setItem(row, 0, QtWidgets.QTableWidgetItem(str(t.get('id', ''))))
-            self.tracks_table.setItem(row, 1, QtWidgets.QTableWidgetItem(str(t.get('type', ''))))
+            # ID with monospace font
+            id_item = QtWidgets.QTableWidgetItem(str(t.get('id', '')))
+            id_item.setFont(QtGui.QFont("monospace"))
+            self.tracks_table.setItem(row, 0, id_item)
+            
+            # Type with subtle styling
+            type_item = QtWidgets.QTableWidgetItem(str(t.get('type', '')))
+            type_item.setForeground(QtGui.QColor("#6b7280"))
+            self.tracks_table.setItem(row, 1, type_item)
+            
+            # Name (primary text)
             self.tracks_table.setItem(row, 2, QtWidgets.QTableWidgetItem(str(t.get('name', ''))))
-            self.tracks_table.setItem(row, 3, QtWidgets.QTableWidgetItem(str(t.get('place', ''))))
-            self.tracks_table.setItem(row, 4, QtWidgets.QTableWidgetItem(str(t.get('trackCode', ''))))
+            
+            # Place
+            place_item = QtWidgets.QTableWidgetItem(str(t.get('place', '')))
+            place_item.setForeground(QtGui.QColor("#6b7280"))
+            self.tracks_table.setItem(row, 3, place_item)
+            
+            # Code with monospace
+            code_item = QtWidgets.QTableWidgetItem(str(t.get('trackCode', '')))
+            code_item.setFont(QtGui.QFont("monospace"))
+            code_item.setForeground(QtGui.QColor("#6b7280"))
+            self.tracks_table.setItem(row, 4, code_item)
+            
+            # Occupied status with color coding
             occ = t.get('occupied')
             occ_text = "Yes" if occ is True else ("No" if occ is False else "-")
-            self.tracks_table.setItem(row, 5, QtWidgets.QTableWidgetItem(occ_text))
+            occ_item = QtWidgets.QTableWidgetItem(occ_text)
+            occ_item.font().setBold(True)
+            
+            if occ is True:
+                occ_item.setForeground(QtGui.QColor("#ef4444"))  # Red for occupied
+                occ_item.setBackground(QtGui.QColor("#fef2f2"))
+            elif occ is False:
+                occ_item.setForeground(QtGui.QColor("#10b981"))  # Green for free
+                occ_item.setBackground(QtGui.QColor("#ecfdf5"))
+            else:
+                occ_item.setForeground(QtGui.QColor("#6b7280"))  # Gray for unknown
+                
+            self.tracks_table.setItem(row, 5, occ_item)
+            
+        # Enhanced column sizing
         header = self.tracks_table.horizontalHeader()
-        header.setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(1, QtWidgets.QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(2, QtWidgets.QHeaderView.Stretch)
-        for col in [3, 4, 5]:
-            header.setSectionResizeMode(col, QtWidgets.QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeToContents)  # ID
+        header.setSectionResizeMode(1, QtWidgets.QHeaderView.ResizeToContents)  # Type
+        header.setSectionResizeMode(2, QtWidgets.QHeaderView.Stretch)  # Name (expandable)
+        header.setSectionResizeMode(3, QtWidgets.QHeaderView.ResizeToContents)  # Place
+        header.setSectionResizeMode(4, QtWidgets.QHeaderView.ResizeToContents)  # Code
+        header.setSectionResizeMode(5, QtWidgets.QHeaderView.ResizeToContents)  # Occupied
         header.setStretchLastSection(False)
 
     def updateRoutesTable(self, routes):
+        """Update routes table with enhanced styling"""
         self.routes_table.setRowCount(len(routes))
         self.routes_table.setColumnCount(5)
-        self.routes_table.setHorizontalHeaderLabels(["ID", "Begin", "End", "State", "Active"])
+        self.routes_table.setHorizontalHeaderLabels(["ID", "Begin Signal", "End Signal", "State", "Active"])
+        
         for row, r in enumerate(routes):
-            self.routes_table.setItem(row, 0, QtWidgets.QTableWidgetItem(str(r.get('id', ''))))
-            self.routes_table.setItem(row, 1, QtWidgets.QTableWidgetItem(str(r.get('beginSignal', ''))))
-            self.routes_table.setItem(row, 2, QtWidgets.QTableWidgetItem(str(r.get('endSignal', ''))))
-            self.routes_table.setItem(row, 3, QtWidgets.QTableWidgetItem(str(r.get('state', ''))))
+            # ID with monospace
+            id_item = QtWidgets.QTableWidgetItem(str(r.get('id', '')))
+            id_item.setFont(QtGui.QFont("monospace"))
+            self.routes_table.setItem(row, 0, id_item)
+            
+            # Begin Signal with monospace
+            begin_item = QtWidgets.QTableWidgetItem(str(r.get('beginSignal', '')))
+            begin_item.setFont(QtGui.QFont("monospace"))
+            begin_item.setForeground(QtGui.QColor("#6b7280"))
+            self.routes_table.setItem(row, 1, begin_item)
+            
+            # End Signal with monospace  
+            end_item = QtWidgets.QTableWidgetItem(str(r.get('endSignal', '')))
+            end_item.setFont(QtGui.QFont("monospace"))
+            end_item.setForeground(QtGui.QColor("#6b7280"))
+            self.routes_table.setItem(row, 2, end_item)
+            
+            # State with color coding
+            state_text = str(r.get('state', ''))
+            state_item = QtWidgets.QTableWidgetItem(state_text)
+            state_item.font().setBold(True)
+            
+            if state_text.upper() in ['ACTIVE', 'LOCKED']:
+                state_item.setForeground(QtGui.QColor("#10b981"))  # Green
+                state_item.setBackground(QtGui.QColor("#ecfdf5"))
+            elif state_text.upper() in ['INACTIVE', 'UNLOCKED']:
+                state_item.setForeground(QtGui.QColor("#6b7280"))  # Gray
+            elif state_text.upper() in ['ERROR', 'FAILED']:
+                state_item.setForeground(QtGui.QColor("#ef4444"))  # Red
+                state_item.setBackground(QtGui.QColor("#fef2f2"))
+            else:
+                state_item.setForeground(QtGui.QColor("#f59e0b"))  # Amber for unknown
+                state_item.setBackground(QtGui.QColor("#fffbeb"))
+                
+            self.routes_table.setItem(row, 3, state_item)
+            
+            # Active status
             act = r.get('isActive')
-            self.routes_table.setItem(row, 4, QtWidgets.QTableWidgetItem("Yes" if act else "No"))
+            act_text = "Yes" if act else "No"
+            act_item = QtWidgets.QTableWidgetItem(act_text)
+            act_item.font().setBold(True)
+            
+            if act:
+                act_item.setForeground(QtGui.QColor("#10b981"))  # Green for active
+                act_item.setBackground(QtGui.QColor("#ecfdf5"))
+            else:
+                act_item.setForeground(QtGui.QColor("#6b7280"))  # Gray for inactive
+                
+            self.routes_table.setItem(row, 4, act_item)
+            
+        # Enhanced column sizing
         header = self.routes_table.horizontalHeader()
-        for col in [0, 1, 2, 3, 4]:
-            mode = QtWidgets.QHeaderView.Stretch if col in [1, 2] else QtWidgets.QHeaderView.ResizeToContents
-            header.setSectionResizeMode(col, mode)
+        header.setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeToContents)  # ID
+        header.setSectionResizeMode(1, QtWidgets.QHeaderView.Stretch)  # Begin Signal
+        header.setSectionResizeMode(2, QtWidgets.QHeaderView.Stretch)  # End Signal  
+        header.setSectionResizeMode(3, QtWidgets.QHeaderView.ResizeToContents)  # State
+        header.setSectionResizeMode(4, QtWidgets.QHeaderView.ResizeToContents)  # Active
         header.setStretchLastSection(False)
 
     def updateTrainsTable(self, trains):
+        """Update trains table with enhanced styling"""
         self.trains_table.setRowCount(len(trains))
         self.trains_table.setColumnCount(6)
-        self.trains_table.setHorizontalHeaderLabels(["ID", "Service", "Status", "Active", "Speed", "Max"])
+        self.trains_table.setHorizontalHeaderLabels(["ID", "Service", "Status", "Active", "Speed", "Max Speed"])
+        
         for row, tr in enumerate(trains):
-            self.trains_table.setItem(row, 0, QtWidgets.QTableWidgetItem(str(tr.get('id', ''))))
-            self.trains_table.setItem(row, 1, QtWidgets.QTableWidgetItem(str(tr.get('serviceCode', ''))))
-            self.trains_table.setItem(row, 2, QtWidgets.QTableWidgetItem(str(tr.get('status', ''))))
-            self.trains_table.setItem(row, 3, QtWidgets.QTableWidgetItem("Yes" if tr.get('active') else "No"))
+            # Train ID with monospace
+            id_item = QtWidgets.QTableWidgetItem(str(tr.get('id', '')))
+            id_item.setFont(QtGui.QFont("monospace"))
+            self.trains_table.setItem(row, 0, id_item)
+            
+            # Service Code with monospace
+            service_item = QtWidgets.QTableWidgetItem(str(tr.get('serviceCode', '')))
+            service_item.setFont(QtGui.QFont("monospace"))
+            service_item.setForeground(QtGui.QColor("#6b7280"))
+            self.trains_table.setItem(row, 1, service_item)
+            
+            # Status with color coding
+            status_text = str(tr.get('status', ''))
+            status_item = QtWidgets.QTableWidgetItem(status_text)
+            status_item.font().setBold(True)
+            
+            if status_text.upper() in ['RUNNING', 'MOVING']:
+                status_item.setForeground(QtGui.QColor("#10b981"))  # Green
+                status_item.setBackground(QtGui.QColor("#ecfdf5"))
+            elif status_text.upper() in ['STOPPED', 'PARKED']:
+                status_item.setForeground(QtGui.QColor("#6b7280"))  # Gray
+            elif status_text.upper() in ['DELAYED', 'WARNING']:
+                status_item.setForeground(QtGui.QColor("#f59e0b"))  # Amber
+                status_item.setBackground(QtGui.QColor("#fffbeb"))
+            elif status_text.upper() in ['ERROR', 'EMERGENCY']:
+                status_item.setForeground(QtGui.QColor("#ef4444"))  # Red
+                status_item.setBackground(QtGui.QColor("#fef2f2"))
+            else:
+                status_item.setForeground(QtGui.QColor("#6b7280"))  # Default gray
+                
+            self.trains_table.setItem(row, 2, status_item)
+            
+            # Active status
+            act = tr.get('active')
+            act_text = "Yes" if act else "No"
+            act_item = QtWidgets.QTableWidgetItem(act_text)
+            act_item.font().setBold(True)
+            
+            if act:
+                act_item.setForeground(QtGui.QColor("#10b981"))  # Green for active
+                act_item.setBackground(QtGui.QColor("#ecfdf5"))
+            else:
+                act_item.setForeground(QtGui.QColor("#6b7280"))  # Gray for inactive
+                
+            self.trains_table.setItem(row, 3, act_item)
+            
+            # Current Speed with monospace
             speed = tr.get('speedKmh')
-            self.trains_table.setItem(row, 4, QtWidgets.QTableWidgetItem(f"{speed} km/h" if speed is not None else "-"))
+            speed_text = f"{speed} km/h" if speed is not None else "-"
+            speed_item = QtWidgets.QTableWidgetItem(speed_text)
+            speed_item.setFont(QtGui.QFont("monospace"))
+            
+            # Color code based on speed
+            if speed is not None:
+                if speed > 80:
+                    speed_item.setForeground(QtGui.QColor("#ef4444"))  # Red for high speed
+                elif speed > 40:
+                    speed_item.setForeground(QtGui.QColor("#f59e0b"))  # Amber for medium speed
+                else:
+                    speed_item.setForeground(QtGui.QColor("#10b981"))  # Green for low speed
+            else:
+                speed_item.setForeground(QtGui.QColor("#6b7280"))  # Gray for unknown
+                
+            self.trains_table.setItem(row, 4, speed_item)
+            
+            # Max Speed with monospace
             maxs = tr.get('maxSpeed') or tr.get('maxSpeedKmh')
-            self.trains_table.setItem(row, 5, QtWidgets.QTableWidgetItem(f"{maxs} km/h" if maxs is not None else "-"))
+            max_text = f"{maxs} km/h" if maxs is not None else "-"
+            max_item = QtWidgets.QTableWidgetItem(max_text)
+            max_item.setFont(QtGui.QFont("monospace"))
+            max_item.setForeground(QtGui.QColor("#6b7280"))
+            self.trains_table.setItem(row, 5, max_item)
+            
+        # Enhanced column sizing
         header = self.trains_table.horizontalHeader()
-        header.setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(1, QtWidgets.QHeaderView.Stretch)
-        for col in [2, 3, 4, 5]:
-            header.setSectionResizeMode(col, QtWidgets.QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeToContents)  # ID
+        header.setSectionResizeMode(1, QtWidgets.QHeaderView.Stretch)  # Service (expandable)
+        header.setSectionResizeMode(2, QtWidgets.QHeaderView.ResizeToContents)  # Status
+        header.setSectionResizeMode(3, QtWidgets.QHeaderView.ResizeToContents)  # Active
+        header.setSectionResizeMode(4, QtWidgets.QHeaderView.ResizeToContents)  # Speed
+        header.setSectionResizeMode(5, QtWidgets.QHeaderView.ResizeToContents)  # Max Speed
         header.setStretchLastSection(False)
 
-    def onChangeSignal(self):
-        row = self.signals_table.currentRow()
-        if row < 0 or row >= len(self.signals_data):
-            return
-        sig = self.signals_data[row]
-        new_status, ok = QtWidgets.QInputDialog.getItem(self, "Change Signal", "New Status:", ["GREEN","YELLOW","RED"], 0, False)
-        if not ok:
-            return
-
-        import threading
-
-        def _run(sig_id):
-            try:
-                url = f"{self._base_url}/api/systems/signals/{sig_id}/status"
-                body = {"newStatus": new_status, "reason": "Manual override", "userId": "DISPATCHER_UI"}
-                resp = self._http().put(url, json=body, timeout=5)
-                resp.raise_for_status()
-                self.loadOverviewFromApi()
-            except Exception as e:
-                QtWidgets.QMessageBox.critical(self, "Error", f"Failed to change status: {e}")
-
-        threading.Thread(target=_run, args=(sig.get('id'),), daemon=True).start()

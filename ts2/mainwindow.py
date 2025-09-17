@@ -552,12 +552,10 @@ class MainWindow(QtWidgets.QMainWindow):
         if hasattr(self, 'current_view') and self.current_view == "simulation":
             # Force visibility of bottom panels
             if hasattr(self, 'trainListPanel'):
-                self.trainListPanel.setVisible(True)
                 self.trainListPanel.show()
                 print(f"Trains panel visible: {self.trainListPanel.isVisible()}")
             
             if hasattr(self, 'serviceListPanel'):
-                self.serviceListPanel.setVisible(True)
                 self.serviceListPanel.show()
                 print(f"Services panel visible: {self.serviceListPanel.isVisible()}")
             
@@ -594,8 +592,6 @@ class MainWindow(QtWidgets.QMainWindow):
                 # Bottom panels (Trains & Services) - ONLY visible in simulation view
                 self.trainListPanel.show()
                 self.serviceListPanel.show()
-                self.trainListPanel.setVisible(True)
-                self.serviceListPanel.setVisible(True)
                 
                 # Ensure trains panel is the active tab
                 self.trainListPanel.raise_()
@@ -618,8 +614,6 @@ class MainWindow(QtWidgets.QMainWindow):
                 # Hide bottom panels (trains & services) - only for simulation view
                 self.trainListPanel.hide()
                 self.serviceListPanel.hide()
-                self.trainListPanel.setVisible(False)
-                self.serviceListPanel.setVisible(False)
                 
                 # Hide AI hints in non-simulation views
                 self.ai_hints_dock.hide()
@@ -646,15 +640,19 @@ class MainWindow(QtWidgets.QMainWindow):
     @QtCore.pyqtSlot()
     def onAfterShow(self):
         """Fires a few moments after window shows"""
-        # FINAL enforcement of bottom panel visibility
+        # FINAL enforcement of bottom panel visibility - only if in simulation view
         print("onAfterShow: Final bottom panels enforcement...")
-        self.trainListPanel.setVisible(True)
-        self.serviceListPanel.setVisible(True)
-        self.trainListPanel.show()
-        self.serviceListPanel.show()
-        self.trainListPanel.raise_()
-        print(f"Final check - Trains visible: {self.trainListPanel.isVisible()}")
-        print(f"Final check - Services visible: {self.serviceListPanel.isVisible()}")
+        
+        if hasattr(self, 'current_view') and self.current_view == "simulation":
+            self.trainListPanel.setVisible(True)
+            self.serviceListPanel.setVisible(True)
+            self.trainListPanel.show()
+            self.serviceListPanel.show()
+            self.trainListPanel.raise_()
+            print(f"Final check - Trains visible: {self.trainListPanel.isVisible()}")
+            print(f"Final check - Services visible: {self.serviceListPanel.isVisible()}")
+        else:
+            print("Not in simulation view - skipping panel enforcement")
         
         if not settings.b(settings.INITIAL_SETUP, False):
             self.openSettingsDialog()

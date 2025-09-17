@@ -501,7 +501,6 @@ class KPITile(QtWidgets.QWidget):
             }
             KPITile:hover {
                 border-color: #3b82f6;
-                box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
             }
         """)
         

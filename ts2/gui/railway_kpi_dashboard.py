@@ -129,7 +129,7 @@ class RailwayKPIDashboard(QtWidgets.QWidget):
         self.time_combo = QtWidgets.QComboBox()
         self.time_combo.addItems(["Last Hour", "Last 6 Hours", "Today", "Last 24h", "Last Week", "Last Month"])
         self.time_combo.setCurrentText("Today")
-        self.time_combo.setStyleSheet(self._getMinimalComboBoxStyle("#3b82f6"))
+        self.time_combo.setStyleSheet(self._getModernComboBoxStyle("#3b82f6"))
         controls_row.addWidget(self.time_combo)
         self.time_combo.currentTextChanged.connect(self.requestDataRefresh)
         
@@ -219,7 +219,7 @@ class RailwayKPIDashboard(QtWidgets.QWidget):
         self.period_combo = QtWidgets.QComboBox()
         self.period_combo.addItems(["Hourly", "Daily", "Weekly"])
         self.period_combo.setCurrentText("Hourly")
-        self.period_combo.setStyleSheet(self._getMinimalComboBoxStyle("#10b981"))
+        self.period_combo.setStyleSheet(self._getModernComboBoxStyle("#10b981"))
         self.period_combo.currentTextChanged.connect(self._onPeriodChanged)
         period_row.addWidget(self.period_combo)
         
@@ -285,7 +285,6 @@ class RailwayKPIDashboard(QtWidgets.QWidget):
                     }}
                     QWidget:hover {{
                         border-color: {accent_color};
-                        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
                     }}
                 """)
                 card_layout = QtWidgets.QVBoxLayout(chart_card)
@@ -356,70 +355,92 @@ class RailwayKPIDashboard(QtWidgets.QWidget):
         }
         return mapping.get(display_text, "hourly")
         
-    def _getMinimalComboBoxStyle(self, accent_color="#374151"):
-        """Get ultra-minimal combo box styling with no margins/padding"""
+    def _getModernComboBoxStyle(self, accent_color):
+        """Get comprehensive modern combo box styling with custom arrow and animations"""
+        # Extract RGB values for hover background
+        r, g, b = int(accent_color[1:3], 16), int(accent_color[3:5], 16), int(accent_color[5:7], 16)
+        hover_bg = f"rgba({r}, {g}, {b}, 0.05)"
+        focus_shadow = f"rgba({r}, {g}, {b}, 0.15)"
+        
         return f"""
             QComboBox {{
-                padding: 4px 20px 4px 8px;
-                border: 1px solid #d1d5db;
-                border-radius: 0;
+                padding: 12px 40px 12px 16px;
+                border: 2px solid #e5e7eb;
+                border-radius: 12px;
                 background-color: white;
-                font-size: 13px;
-                color: #374151;
-                min-width: 80px;
-                min-height: 24px;
+                font-size: 14px;
+                font-weight: 500;
+                color: #1f2937;
+                min-width: 140px;
+                min-height: 20px;
             }}
             QComboBox:hover {{
                 border-color: {accent_color};
+                background-color: {hover_bg};
             }}
             QComboBox:focus {{
                 border-color: {accent_color};
+                background-color: white;
                 outline: none;
+            }}
+            QComboBox:pressed {{
+                background-color: {hover_bg};
             }}
             QComboBox::drop-down {{
                 subcontrol-origin: padding;
                 subcontrol-position: center right;
-                width: 16px;
-                border: none;
+                width: 30px;
+                border-left: none;
+                border-top-right-radius: 12px;
+                border-bottom-right-radius: 12px;
                 background-color: transparent;
             }}
             QComboBox::down-arrow {{
                 image: none;
                 width: 0;
                 height: 0;
-                border-left: 4px solid transparent;
-                border-right: 4px solid transparent;
-                border-top: 6px solid #6b7280;
-                margin: 0;
+                border-left: 6px solid transparent;
+                border-right: 6px solid transparent;
+                border-top: 8px solid #6b7280;
+                margin-right: 8px;
             }}
             QComboBox:hover::down-arrow {{
                 border-top-color: {accent_color};
             }}
             QComboBox:open::down-arrow {{
                 border-top: none;
-                border-bottom: 6px solid {accent_color};
+                border-bottom: 8px solid {accent_color};
+                margin-top: -2px;
             }}
             QComboBox QAbstractItemView {{
-                border: 1px solid #d1d5db;
+                border: none;
+                border-radius: 12px;
                 background-color: white;
                 selection-background-color: {accent_color};
                 selection-color: white;
-                padding: 0;
-                margin: 0;
+                padding: 8px;
+                margin-top: 4px;
                 outline: none;
             }}
             QComboBox QAbstractItemView::item {{
-                padding: 4px 8px;
-                margin: 0;
-                border: none;
+                padding: 12px 16px;
+                border-radius: 8px;
+                margin: 2px 4px;
+                font-weight: 500;
                 color: #374151;
-                font-size: 13px;
+                border: none;
+                min-height: 20px;
             }}
             QComboBox QAbstractItemView::item:hover {{
-                background-color: #f3f4f6;
-                color: #374151;
+                background-color: {hover_bg};
+                color: {accent_color};
             }}
             QComboBox QAbstractItemView::item:selected {{
+                background-color: {accent_color};
+                color: white;
+                font-weight: 600;
+            }}
+            QComboBox QAbstractItemView::item:selected:hover {{
                 background-color: {accent_color};
                 color: white;
             }}
