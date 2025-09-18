@@ -38,17 +38,22 @@ class NavigationButton(QtWidgets.QPushButton):
         # Set up icon if provided
         if icon_type:
             self.setupIcon(icon_type)
+            
+        # Connect to toggled signal to update icon color
+        self.toggled.connect(self.updateIconColor)
         
-        # Style the button with minimal colors
+        # Style the button with proper icon spacing
         self.setStyleSheet("""
             NavigationButton {
                 background-color: transparent;
                 border: none;
                 text-align: left;
-                padding-left: 15px;
+                padding: 8px 15px 8px 15px;
                 color: #495057;
                 font-size: 14px;
                 font-weight: 500;
+                border-radius: 6px;
+                margin: 2px 8px;
             }
             NavigationButton:hover {
                 background-color: #e9ecef;
@@ -61,23 +66,164 @@ class NavigationButton(QtWidgets.QPushButton):
         """)
         
     def setupIcon(self, icon_type):
-        """Setup the icon based on type"""
-        # Use Qt's built-in standard pixmaps for consistent icons
-        style = self.style()
-        icon_map = {
-            'simulation': QtWidgets.QStyle.SP_ComputerIcon,
-            'map': QtWidgets.QStyle.SP_DirHomeIcon,
-            'status': QtWidgets.QStyle.SP_DialogOkButton,
-            'analysis': QtWidgets.QStyle.SP_FileDialogDetailedView,
-            'dashboard': QtWidgets.QStyle.SP_FileDialogListView,
-            'logs': QtWidgets.QStyle.SP_FileDialogNewFolder
+        """Setup the icon based on type with custom drawn icons"""
+        self.icon_type = icon_type  # Store for later recoloring
+        self.updateIconColor()
+        
+    def updateIconColor(self):
+        """Update icon color based on current button state"""
+        if not hasattr(self, 'icon_type'):
+            return
+            
+        # Use white for active/checked state, gray for inactive
+        if self.isChecked():
+            text_color = QtGui.QColor("#ffffff")  # White for active
+        else:
+            text_color = QtGui.QColor("#495057")  # Gray for inactive
+        
+        def draw_simulation_icon(painter, rect):
+            """Draw simulation/network icon"""
+            center = rect.center()
+            painter.setBrush(QtGui.QBrush(painter.pen().color()))
+            
+            # Draw central node
+            painter.drawEllipse(center, 3, 3)
+            
+            # Draw connected nodes
+            nodes = [
+                QtCore.QPoint(center.x() - 8, center.y() - 6),
+                QtCore.QPoint(center.x() + 8, center.y() - 6),
+                QtCore.QPoint(center.x() - 8, center.y() + 6),
+                QtCore.QPoint(center.x() + 8, center.y() + 6)
+            ]
+            
+            for node in nodes:
+                painter.drawEllipse(node, 2, 2)
+                painter.drawLine(center, node)
+        
+        def draw_map_icon(painter, rect):
+            """Draw map icon"""
+            # Draw folded map outline
+            points = [
+                QtCore.QPoint(rect.left() + 2, rect.top() + 4),
+                QtCore.QPoint(rect.right() - 6, rect.top() + 2),
+                QtCore.QPoint(rect.right() - 2, rect.bottom() - 6),
+                QtCore.QPoint(rect.left() + 6, rect.bottom() - 2),
+                QtCore.QPoint(rect.left() + 2, rect.top() + 4)
+            ]
+            painter.drawPolyline(points)
+            
+            # Draw fold lines
+            painter.drawLine(rect.left() + 6, rect.top() + 2, rect.left() + 6, rect.bottom() - 2)
+            painter.drawLine(rect.right() - 6, rect.top() + 2, rect.right() - 6, rect.bottom() - 2)
+        
+        def draw_status_icon(painter, rect):
+            """Draw status/star icon"""
+            center = rect.center()
+            painter.setBrush(QtGui.QBrush(painter.pen().color()))
+            
+            # Draw simplified status indicator (circle with dot)
+            painter.drawEllipse(center, 6, 6)
+            
+            # Use contrasting color for inner dot
+            if self.isChecked():
+                painter.setBrush(QtGui.QBrush(QtGui.QColor("#495057")))  # Dark dot on light background when active
+            else:
+                painter.setBrush(QtGui.QBrush(QtCore.Qt.white))  # Light dot on dark background when inactive
+            painter.drawEllipse(center, 2, 2)
+        
+        def draw_analysis_icon(painter, rect):
+            """Draw analysis/chart icon"""
+            # Draw chart axes
+            painter.drawLine(rect.left() + 2, rect.bottom() - 2, rect.right() - 2, rect.bottom() - 2)
+            painter.drawLine(rect.left() + 2, rect.top() + 2, rect.left() + 2, rect.bottom() - 2)
+            
+            # Draw chart line
+            points = [
+                QtCore.QPoint(rect.left() + 4, rect.bottom() - 4),
+                QtCore.QPoint(rect.left() + 8, rect.bottom() - 8),
+                QtCore.QPoint(rect.left() + 12, rect.bottom() - 6),
+                QtCore.QPoint(rect.right() - 4, rect.bottom() - 10)
+            ]
+            painter.drawPolyline(points)
+            
+            # Draw data points
+            painter.setBrush(QtGui.QBrush(painter.pen().color()))
+            for point in points:
+                painter.drawEllipse(point, 2, 2)
+        
+        def draw_dashboard_icon(painter, rect):
+            """Draw dashboard/grid icon"""
+            # Draw 2x2 grid
+            mid_x = rect.center().x()
+            mid_y = rect.center().y()
+            
+            # Top-left
+            painter.drawRect(rect.left() + 2, rect.top() + 2, mid_x - rect.left() - 3, mid_y - rect.top() - 3)
+            # Top-right
+            painter.drawRect(mid_x + 1, rect.top() + 2, rect.right() - mid_x - 3, mid_y - rect.top() - 3)
+            # Bottom-left
+            painter.drawRect(rect.left() + 2, mid_y + 1, mid_x - rect.left() - 3, rect.bottom() - mid_y - 3)
+            # Bottom-right
+            painter.drawRect(mid_x + 1, mid_y + 1, rect.right() - mid_x - 3, rect.bottom() - mid_y - 3)
+        
+        def draw_logs_icon(painter, rect):
+            """Draw logs/document icon"""
+            # Draw document outline
+            doc_rect = QtCore.QRect(rect.left() + 3, rect.top() + 2, rect.width() - 8, rect.height() - 4)
+            painter.drawRect(doc_rect)
+            
+            # Draw folded corner
+            corner_size = 4
+            corner_points = [
+                QtCore.QPoint(doc_rect.right() - corner_size, doc_rect.top()),
+                QtCore.QPoint(doc_rect.right(), doc_rect.top() + corner_size),
+                QtCore.QPoint(doc_rect.right() - corner_size, doc_rect.top() + corner_size),
+                QtCore.QPoint(doc_rect.right() - corner_size, doc_rect.top())
+            ]
+            painter.drawPolyline(corner_points)
+            
+            # Draw text lines
+            for i in range(3):
+                y = doc_rect.top() + 6 + i * 3
+                painter.drawLine(doc_rect.left() + 2, y, doc_rect.right() - 6, y)
+        
+        icon_functions = {
+            'simulation': draw_simulation_icon,
+            'map': draw_map_icon,
+            'status': draw_status_icon,
+            'analysis': draw_analysis_icon,
+            'dashboard': draw_dashboard_icon,
+            'logs': draw_logs_icon
         }
         
-        if icon_type in icon_map:
-            pixmap = style.standardPixmap(icon_map[icon_type])
+        if self.icon_type in icon_functions:
+            # Create pixmap with proper size
+            size = 20
+            pixmap = QtGui.QPixmap(size, size)
+            pixmap.fill(QtCore.Qt.transparent)
+            
+            # Create painter and set up styling
+            painter = QtGui.QPainter(pixmap)
+            painter.setRenderHint(QtGui.QPainter.Antialiasing)
+            
+            # Use current text color for the icon
+            pen = QtGui.QPen(text_color)
+            pen.setWidth(2)
+            pen.setCapStyle(QtCore.Qt.RoundCap)
+            pen.setJoinStyle(QtCore.Qt.RoundJoin)
+            painter.setPen(pen)
+            
+            # Draw the icon
+            rect = pixmap.rect().adjusted(2, 2, -2, -2)  # Add some padding
+            icon_functions[self.icon_type](painter, rect)
+            
+            painter.end()
+            
+            # Create icon and set it
             icon = QtGui.QIcon(pixmap)
             self.setIcon(icon)
-            self.setIconSize(QtCore.QSize(16, 16))
+            self.setIconSize(QtCore.QSize(20, 20))
         
     def setCollapsed(self, collapsed):
         """Set the button to collapsed (icon-only) or expanded (text) state"""
@@ -90,10 +236,12 @@ class NavigationButton(QtWidgets.QPushButton):
                     background-color: transparent;
                     border: none;
                     text-align: center;
-                    padding: 0px;
+                    padding: 10px;
                     color: #495057;
                     font-size: 16px;
                     font-weight: 500;
+                    border-radius: 6px;
+                    margin: 2px 8px;
                 }
                 NavigationButton:hover {
                     background-color: #e9ecef;
@@ -104,6 +252,8 @@ class NavigationButton(QtWidgets.QPushButton):
                     border-left: 4px solid #343a40;
                 }
             """)
+            # Update icon color for collapsed state
+            self.updateIconColor()
         else:
             self.setText(self.original_text)  # Show text with icon
             self.setToolTip("")
@@ -112,10 +262,12 @@ class NavigationButton(QtWidgets.QPushButton):
                     background-color: transparent;
                     border: none;
                     text-align: left;
-                    padding-left: 15px;
+                    padding: 8px 15px 8px 15px;
                     color: #495057;
                     font-size: 14px;
                     font-weight: 500;
+                    border-radius: 6px;
+                    margin: 2px 8px;
                 }
                 NavigationButton:hover {
                     background-color: #e9ecef;
@@ -126,6 +278,8 @@ class NavigationButton(QtWidgets.QPushButton):
                     border-left: 4px solid #343a40;
                 }
             """)
+            # Update icon color for expanded state
+            self.updateIconColor()
 
 
 class SidebarNavigation(QtWidgets.QWidget):

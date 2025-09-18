@@ -494,13 +494,15 @@ class KPITile(QtWidgets.QWidget):
         self.setFixedSize(240, 140)
         self.setStyleSheet("""
             KPITile {
-                background-color: white;
-                border: 1px solid #e2e8f0;
+                background-color: rgba(255, 255, 255, 0.7);
+                border: 1px solid rgba(226, 232, 240, 0.6);
                 border-radius: 12px;
                 padding: 16px;
+                margin: 8px;
             }
             KPITile:hover {
-                border-color: #3b82f6;
+                border-color: rgba(59, 130, 246, 0.8);
+                background-color: rgba(255, 255, 255, 0.85);
             }
         """)
         
@@ -562,7 +564,7 @@ class KPITile(QtWidgets.QWidget):
         
         self.sparkline = SparklineChart()
         self.sparkline.setFixedSize(70, 24)
-        bottom_container.addWidget(self.sparkline)
+        # bottom_container.addWidget(self.sparkline)
         
         layout.addLayout(bottom_container)
         

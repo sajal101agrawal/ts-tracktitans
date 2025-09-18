@@ -356,93 +356,37 @@ class RailwayKPIDashboard(QtWidgets.QWidget):
         return mapping.get(display_text, "hourly")
         
     def _getModernComboBoxStyle(self, accent_color):
-        """Get comprehensive modern combo box styling with custom arrow and animations"""
-        # Extract RGB values for hover background
-        r, g, b = int(accent_color[1:3], 16), int(accent_color[3:5], 16), int(accent_color[5:7], 16)
-        hover_bg = f"rgba({r}, {g}, {b}, 0.05)"
-        focus_shadow = f"rgba({r}, {g}, {b}, 0.15)"
-        
+        """Get minimal combo box styling - clean and simple"""
         return f"""
             QComboBox {{
-                padding: 12px 40px 12px 16px;
-                border: 2px solid #e5e7eb;
-                border-radius: 12px;
+                padding: 8px 12px;
+                border: 1px solid #d1d5db;
+                border-radius: 4px;
                 background-color: white;
                 font-size: 14px;
-                font-weight: 500;
-                color: #1f2937;
-                min-width: 140px;
-                min-height: 20px;
+                color: #374151;
+                min-width: 120px;
             }}
             QComboBox:hover {{
-                border-color: {accent_color};
-                background-color: {hover_bg};
+                border-color: #9ca3af;
             }}
             QComboBox:focus {{
-                border-color: {accent_color};
-                background-color: white;
+                border-color: #6b7280;
                 outline: none;
-            }}
-            QComboBox:pressed {{
-                background-color: {hover_bg};
-            }}
-            QComboBox::drop-down {{
-                subcontrol-origin: padding;
-                subcontrol-position: center right;
-                width: 30px;
-                border-left: none;
-                border-top-right-radius: 12px;
-                border-bottom-right-radius: 12px;
-                background-color: transparent;
-            }}
-            QComboBox::down-arrow {{
-                image: none;
-                width: 0;
-                height: 0;
-                border-left: 6px solid transparent;
-                border-right: 6px solid transparent;
-                border-top: 8px solid #6b7280;
-                margin-right: 8px;
-            }}
-            QComboBox:hover::down-arrow {{
-                border-top-color: {accent_color};
-            }}
-            QComboBox:open::down-arrow {{
-                border-top: none;
-                border-bottom: 8px solid {accent_color};
-                margin-top: -2px;
             }}
             QComboBox QAbstractItemView {{
-                border: none;
-                border-radius: 12px;
+                border: 1px solid #d1d5db;
                 background-color: white;
-                selection-background-color: {accent_color};
-                selection-color: white;
-                padding: 8px;
-                margin-top: 4px;
-                outline: none;
+                selection-background-color: #e5e7eb;
+                selection-color: #374151;
             }}
             QComboBox QAbstractItemView::item {{
-                padding: 12px 16px;
-                border-radius: 8px;
-                margin: 2px 4px;
-                font-weight: 500;
+                padding: 8px 12px;
                 color: #374151;
-                border: none;
-                min-height: 20px;
-            }}
-            QComboBox QAbstractItemView::item:hover {{
-                background-color: {hover_bg};
-                color: {accent_color};
             }}
             QComboBox QAbstractItemView::item:selected {{
-                background-color: {accent_color};
-                color: white;
-                font-weight: 600;
-            }}
-            QComboBox QAbstractItemView::item:selected:hover {{
-                background-color: {accent_color};
-                color: white;
+                background-color: #e5e7eb;
+                color: #374151;
             }}
         """
         
