@@ -1056,39 +1056,35 @@ class WhatIfAnalysisWidget(QtWidgets.QWidget):
         self.setupUI()
         
     def setupUI(self):
-        """Setup modern, clean what-if analysis UI"""
+        """Setup What-If Analysis UI matching System Status design"""
         main_layout = QtWidgets.QVBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
         
-        # Modern base styling with minimal accent
+        # Set enhanced background with subtle gradient to match System Status
         self.setStyleSheet("""
             QWidget {
-                background-color: #fafbfc;
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, system-ui, sans-serif;
+                background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                    stop: 0 #fdfdfe, stop: 1 #f7f8fc);
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             }
         """)
         
-        # Scrollable container
-        scroll = QtWidgets.QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QtWidgets.QFrame.NoFrame)
-        scroll.setStyleSheet(self._getScrollAreaStyle())
-        
+        # Simple container without scroll to match System Status
         content = QtWidgets.QWidget()
         layout = QtWidgets.QVBoxLayout(content)
-        layout.setContentsMargins(10, 10, 10, 10)
-        layout.setSpacing(10)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(12)
         
         # Header section with actions
         self._setupHeaderSection(layout)
         
         # Main content in two-column layout
         content_layout = QtWidgets.QHBoxLayout()
-        content_layout.setSpacing(10)
+        content_layout.setSpacing(12)
         
         # Left column - Configuration
         left_column = QtWidgets.QVBoxLayout()
-        left_column.setSpacing(8)
+        left_column.setSpacing(12)
         self._setupConfigurationSection(left_column)
         self._setupScenarioBuilder(left_column)
         
@@ -1098,7 +1094,7 @@ class WhatIfAnalysisWidget(QtWidgets.QWidget):
         
         # Right column - Results and Visualization
         right_column = QtWidgets.QVBoxLayout()
-        right_column.setSpacing(8)
+        right_column.setSpacing(12)
         self._setupResultsSection(right_column)
         
         right_widget = QtWidgets.QWidget()
@@ -1107,51 +1103,37 @@ class WhatIfAnalysisWidget(QtWidgets.QWidget):
         
         layout.addLayout(content_layout)
         
-        scroll.setWidget(content)
-        main_layout.addWidget(scroll)
+        main_layout.addWidget(content)
         
     def _setupHeaderSection(self, parent_layout):
-        """Setup modern header with title and main actions"""
-        header_widget = QtWidgets.QWidget()
-        header_layout = QtWidgets.QHBoxLayout(header_widget)
-        header_layout.setContentsMargins(0, 0, 0, 0)
+        """Setup header matching System Status design"""
+        header_row = QtWidgets.QHBoxLayout()
         
-        # Title and description
-        title_layout = QtWidgets.QVBoxLayout()
-        title_layout.setSpacing(4)
-        
-        title = QtWidgets.QLabel("What If Analysis")
-        title.setStyleSheet("""
-            font-size: 28px; 
+        # What-If Analysis label with clean styling
+        title_label = QtWidgets.QLabel("What-If Analysis")
+        title_label.setStyleSheet("""
+            font-size: 18px; 
             font-weight: 700; 
-            color: #0f172a;
-            margin: 0;
+            color: #1e293b;
         """)
-        title_layout.addWidget(title)
+        header_row.addWidget(title_label)
         
-        subtitle = QtWidgets.QLabel("Model operational scenarios and predict system impacts")
-        subtitle.setStyleSheet("""
-            font-size: 16px; 
-            color: #6b7280; 
-            font-weight: 400;
-            margin: 0;
+        header_row.addStretch()
+        
+        # Analysis status indicator
+        self.analysis_indicator = QtWidgets.QLabel("Ready")
+        self.analysis_indicator.setStyleSheet("""
+            color: #64748b; 
+            font-size: 12px; 
+            font-weight: 500;
+            background-color: #f1f5f9;
+            padding: 4px 8px;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
         """)
-        title_layout.addWidget(subtitle)
-        header_layout.addLayout(title_layout)
+        header_row.addWidget(self.analysis_indicator)
         
-        header_layout.addStretch()
-        
-        # Main action button
-        actions_layout = QtWidgets.QHBoxLayout()
-        actions_layout.setSpacing(12)
-        
-        self.run_analysis_btn = QtWidgets.QPushButton("Run Analysis")
-        self.run_analysis_btn.clicked.connect(self.runAnalysis)
-        self.run_analysis_btn.setStyleSheet(self._getPrimaryButtonStyle())
-        actions_layout.addWidget(self.run_analysis_btn)
-        
-        header_layout.addLayout(actions_layout)
-        parent_layout.addWidget(header_widget)
+        parent_layout.addLayout(header_row)
         
     def _setupConfigurationSection(self, parent_layout):
         """Setup scenario configuration section"""
@@ -1168,6 +1150,12 @@ class WhatIfAnalysisWidget(QtWidgets.QWidget):
         self.duration_spin.setStyleSheet(self._getInputStyle())
         time_row.addWidget(self.duration_spin)
         config_layout.addLayout(time_row)
+        
+        # Run Analysis button
+        self.run_analysis_btn = QtWidgets.QPushButton("Run Analysis")
+        self.run_analysis_btn.clicked.connect(self.runAnalysis)
+        self.run_analysis_btn.setStyleSheet(self._getPrimaryButtonStyle())
+        config_layout.addWidget(self.run_analysis_btn)
         
         parent_layout.addWidget(config_card)
         
@@ -1347,7 +1335,7 @@ class WhatIfAnalysisWidget(QtWidgets.QWidget):
         self.recommendations_list.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         recommendations_layout.addWidget(self.recommendations_list)
         
-        self.results_tabs.addTab(recommendations_widget, "Suggestions")
+        self.results_tabs.addTab(recommendations_widget, "Rec")
         
         # Bottlenecks
         bottlenecks_widget = QtWidgets.QWidget()
@@ -1390,44 +1378,35 @@ class WhatIfAnalysisWidget(QtWidgets.QWidget):
         """
     
     def _createCard(self, title, subtitle=""):
-        """Create a modern card widget with title"""
+        """Create card widget matching System Status design"""
         card = QtWidgets.QWidget()
         card.setStyleSheet("""
             QWidget {
-                background-color: white;
+                background-color: #ffffff;
+                border: 1px solid #e1e7ef;
                 border-radius: 12px;
-                border: none;
             }
         """)
         
         layout = QtWidgets.QVBoxLayout(card)
-        layout.setContentsMargins(10, 10, 10, 10)
-        layout.setSpacing(8)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(12)
         
-        # Card header
-        header_layout = QtWidgets.QVBoxLayout()
-        header_layout.setSpacing(4)
-        
-        title_label = QtWidgets.QLabel(title)
-        title_label.setStyleSheet("""
-            font-size: 18px; 
+        # Card header matching System Status tabs style
+        if title:
+            title_label = QtWidgets.QLabel(title)
+            title_label.setStyleSheet("""
+                font-size: 14px; 
             font-weight: 600; 
             color: #1e293b;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
             margin: 0;
-        """)
-        header_layout.addWidget(title_label)
-        
-        if subtitle:
-            subtitle_label = QtWidgets.QLabel(subtitle)
-            subtitle_label.setStyleSheet("""
-                font-size: 14px; 
-                color: #64748b; 
-                font-weight: 400;
-                margin: 0;
+                padding-bottom: 8px;
+                border-bottom: 2px solid #e2e8f0;
             """)
-            header_layout.addWidget(subtitle_label)
+            layout.addWidget(title_label)
         
-        layout.addLayout(header_layout)
         return card
     
     def _createFormRow(self, label_text, help_text=""):
@@ -1515,49 +1494,51 @@ class WhatIfAnalysisWidget(QtWidgets.QWidget):
         return card
     
     def _getInputStyle(self):
-        """Modern input field styling"""
+        """Input field styling matching System Status"""
         return """
             QLineEdit, QSpinBox, QTimeEdit {
-                padding: 8px 10px;
-                border: none;
-                border-radius: 8px;
-                background-color: #f1f3f4;
-                font-size: 14px;
+                padding: 8px 12px;
+                border: 1px solid #cbd5e1;
+                border-radius: 6px;
+                background-color: white;
+                font-size: 13px;
                 font-weight: 500;
                 color: #1f2937;
                 min-height: 18px;
             }
             QLineEdit:hover, QSpinBox:hover, QTimeEdit:hover {
-                background-color: #e8eaed;
+                border-color: #94a3b8;
+                background-color: #f8fafc;
             }
             QLineEdit:focus, QSpinBox:focus, QTimeEdit:focus {
-                background-color: #f9fafb;
-                border: 2px solid #6b7280;
+                border-color: #6366f1;
+                background-color: white;
                 outline: none;
             }
         """
     
     def _getRadioButtonStyle(self):
-        """Modern radio button styling"""
+        """Radio button styling matching System Status"""
         return """
             QRadioButton {
                 font-size: 13px;
                 font-weight: 500;
-                color: #374151;
-                spacing: 4px;
-                padding: 4px 8px;
-                border-radius: 4px;
-                background-color: #f9fafb;
-                border: 1px solid #e5e7eb;
+                color: #1e293b;
+                spacing: 6px;
+                padding: 6px 12px;
+                border-radius: 6px;
+                background-color: #ffffff;
+                border: 1px solid #cbd5e1;
             }
             QRadioButton:hover {
-                background-color: #f3f4f6;
-                border-color: #d1d5db;
+                background-color: #f8fafc;
+                border-color: #94a3b8;
+                color: #334155;
             }
             QRadioButton:checked {
-                background-color: #374151;
+                background-color: #6366f1;
                 color: white;
-                border-color: #374151;
+                border-color: #6366f1;
             }
             QRadioButton::indicator {
                 width: 0px;
@@ -1566,99 +1547,130 @@ class WhatIfAnalysisWidget(QtWidgets.QWidget):
         """
     
     def _getPrimaryButtonStyle(self):
-        """Primary action button styling"""
+        """Primary action button styling matching System Status"""
         return """
             QPushButton {
-                background-color: #374151;
+                background-color: #3b82f6;
                 color: white;
                 border: none;
                 padding: 8px 16px;
-                border-radius: 6px;
+                border-radius: 8px;
                 font-weight: 600;
-                font-size: 14px;
-                min-width: 120px;
+                font-size: 13px;
+                min-width: 100px;
             }
             QPushButton:hover {
-                background-color: #1f2937;
+                background-color: #2563eb;
             }
             QPushButton:pressed {
-                background-color: #111827;
+                background-color: #1d4ed8;
             }
         """
     
     def _getSecondaryButtonStyle(self):
-        """Secondary action button styling"""
+        """Secondary action button styling matching System Status"""
         return """
             QPushButton {
-                background-color: #f1f3f4;
-                color: #374151;
-                border: none;
-                padding: 6px 12px;
-                border-radius: 6px;
-                font-weight: 500;
-                font-size: 14px;
+                background-color: #ffffff;
+                color: #475569;
+                border: 1px solid #cbd5e1;
+                padding: 8px 16px;
+                border-radius: 8px;
+                font-weight: 600;
+                font-size: 13px;
+                min-width: 80px;
             }
             QPushButton:hover {
-                background-color: #e8eaed;
-                color: #1f2937;
+                background-color: #f8fafc;
+                border-color: #94a3b8;
+                color: #334155;
             }
             QPushButton:pressed {
-                background-color: #dadce0;
+                background-color: #e2e8f0;
             }
         """
     
     def _getTabStyle(self):
-        """Modern tab widget styling"""
+        """Tab widget styling matching System Status"""
         return """
             QTabWidget::pane {
                 border: none;
-                border-radius: 10px;
-                background-color: #fafbfc;
-                padding: 8px;
+                background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                    stop: 0 #ffffff, stop: 1 #fdfdfe);
+                border-radius: 8px;
+            }
+            QTabWidget::tab-bar {
+                alignment: left;
+                background: transparent;
+            }
+            QTabBar {
+                qproperty-drawBase: 0;
+                border: none;
+                background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                    stop: 0 #f8fafc, stop: 1 #f1f5f9);
+                border-top-left-radius: 12px;
+                border-top-right-radius: 12px;
             }
             QTabBar::tab {
-                background-color: transparent;
-                color: #6b7280;
-                padding: 6px 12px;
-                border: none;
-                border-radius: 4px;
+                background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                    stop: 0 #f1f5f9, stop: 1 #e2e8f0);
+                color: #64748b;
+                padding: 12px 20px;
+                margin-right: 1px;
+                margin-bottom: 0px;
+                border-top-left-radius: 8px;
+                border-top-right-radius: 8px;
+                border-bottom: 3px solid transparent;
                 font-weight: 500;
-                margin-right: 3px;
-                margin-bottom: 4px;
+                font-size: 13px;
+                min-width: 80px;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
             }
             QTabBar::tab:selected {
-                background-color: #374151;
-                color: white;
+                background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                    stop: 0 #ffffff, stop: 1 #f8fafc);
+                color: #1e293b;
+                font-weight: 700;
+                border-bottom: 3px solid #6366f1;
+                margin-top: 0px;
             }
             QTabBar::tab:hover:!selected {
-                background-color: #f1f3f4;
-                color: #374151;
+                background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                    stop: 0 #e2e8f0, stop: 1 #cbd5e1);
+                color: #475569;
+                border-bottom: 3px solid #94a3b8;
+            }
+            QTabBar::tab:first {
+                margin-left: 8px;
             }
         """
     
     def _getListStyle(self):
-        """Modern list widget styling"""
+        """List widget styling matching System Status"""
         return """
             QListWidget {
-                border: none;
-                border-radius: 8px;
-                background-color: #fafbfc;
-                font-size: 14px;
+                border: 1px solid #e2e8f0;
+                border-radius: 6px;
+                background-color: #ffffff;
+                font-size: 13px;
                 padding: 4px;
             }
             QListWidget::item {
-                padding: 8px 10px;
+                padding: 8px 12px;
                 border: none;
                 border-radius: 4px;
                 margin: 1px 0;
-                background-color: white;
+                background-color: transparent;
+                color: #1e293b;
             }
             QListWidget::item:hover {
-                background-color: #f1f3f4;
+                background-color: #f8fafc;
+                color: #0f172a;
             }
             QListWidget::item:selected {
-                background-color: #374151;
-                color: white;
+                background-color: #eff6ff;
+                color: #1e40af;
             }
         """
     
@@ -1761,6 +1773,18 @@ class WhatIfAnalysisWidget(QtWidgets.QWidget):
                 "Please add trains or signal modifications to analyze.")
             return
             
+        # Update status indicator
+        self.analysis_indicator.setText("Running...")
+        self.analysis_indicator.setStyleSheet("""
+            color: #d97706; 
+            font-size: 12px; 
+            font-weight: 500;
+            background-color: #fffbeb;
+            padding: 4px 8px;
+            border-radius: 12px;
+            border: 1px solid #fed7aa;
+        """)
+            
         QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
         
         try:
@@ -1769,7 +1793,30 @@ class WhatIfAnalysisWidget(QtWidgets.QWidget):
             self.current_results = results
             self._displayResults(results)
             
+            # Update status to completed
+            self.analysis_indicator.setText("Completed")
+            self.analysis_indicator.setStyleSheet("""
+                color: #059669; 
+                font-size: 12px; 
+                font-weight: 500;
+                background-color: #ecfdf5;
+                padding: 4px 8px;
+                border-radius: 12px;
+                border: 1px solid #a7f3d0;
+            """)
+            
         except Exception as e:
+            # Update status to error
+            self.analysis_indicator.setText("Error")
+            self.analysis_indicator.setStyleSheet("""
+                color: #dc2626; 
+                font-size: 12px; 
+                font-weight: 500;
+                background-color: #fef2f2;
+                padding: 4px 8px;
+                border-radius: 12px;
+                border: 1px solid #fecaca;
+            """)
             QtWidgets.QMessageBox.critical(self, "Analysis Error", f"Failed to run analysis: {str(e)}")
         finally:
             QtWidgets.QApplication.restoreOverrideCursor()
