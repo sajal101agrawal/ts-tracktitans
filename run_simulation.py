@@ -15,6 +15,7 @@ import subprocess
 import time
 import signal
 import atexit
+import platform
 from pathlib import Path
 
 # Global variables for process management
@@ -52,7 +53,76 @@ def signal_handler(signum, frame):
     sys.exit(0)
 
 def kill_processes_on_port(port):
-    """Kill any processes using the specified port"""
+    """Kill any processes using the specified port (cross-platform)"""
+    system = platform.system().lower()
+    
+    try:
+        if system == "windows":
+            return _kill_processes_windows(port)
+        else:
+            return _kill_processes_unix(port)
+    except Exception as e:
+        print(f"⚠️  Error while clearing port {port}: {e}")
+        return False
+
+def _kill_processes_windows(port):
+    """Kill processes on Windows using netstat and taskkill"""
+    try:
+        # Use netstat to find processes using the port
+        result = subprocess.run(
+            ['netstat', '-ano'],
+            capture_output=True,
+            text=True,
+            shell=True
+        )
+        
+        if result.returncode != 0:
+            print("⚠️  Could not run netstat command")
+            return False
+        
+        pids = []
+        for line in result.stdout.split('\n'):
+            if f':{port}' in line and 'LISTENING' in line:
+                # Extract PID (last column)
+                parts = line.strip().split()
+                if len(parts) >= 5:
+                    pid = parts[-1]
+                    if pid.isdigit():
+                        pids.append(pid)
+        
+        if pids:
+            print(f"🔍 Found {len(pids)} process(es) using port {port}")
+            
+            for pid in pids:
+                try:
+                    print(f"🛑 Killing process {pid}")
+                    # Try graceful termination first
+                    subprocess.run(['taskkill', '/PID', pid], 
+                                 capture_output=True, check=True, shell=True)
+                    time.sleep(0.5)
+                    
+                except subprocess.CalledProcessError:
+                    try:
+                        # Force kill if graceful termination fails
+                        print(f"⚡ Force killing process {pid}")
+                        subprocess.run(['taskkill', '/F', '/PID', pid], 
+                                     capture_output=True, check=True, shell=True)
+                    except subprocess.CalledProcessError:
+                        print(f"⚠️  Could not kill process {pid}")
+            
+            print(f"✅ Successfully cleared {len(pids)} process(es) from port {port}")
+            time.sleep(1)  # Give the port time to be released
+        else:
+            print(f"✅ Port {port} is already free - no cleanup needed")
+        
+        return True
+        
+    except Exception as e:
+        print(f"⚠️  Windows port cleanup error: {e}")
+        return False
+
+def _kill_processes_unix(port):
+    """Kill processes on Unix-like systems using lsof"""
     try:
         # Use lsof to find processes using the port
         result = subprocess.run(
@@ -84,11 +154,11 @@ def kill_processes_on_port(port):
                         # Process might already be dead
                         pass
                         
-            print(f"✅ Cleared port {port}")
+            print(f"✅ Successfully cleared {len(pids)} process(es) from port {port}")
             time.sleep(1)  # Give the port time to be released
             
         else:
-            print(f"✅ Port {port} is already free")
+            print(f"✅ Port {port} is already free - no cleanup needed")
             
     except FileNotFoundError:
         # lsof not available, try alternative method
@@ -109,10 +179,6 @@ def kill_processes_on_port(port):
         except:
             pass
             
-    except Exception as e:
-        print(f"⚠️  Error while clearing port {port}: {e}")
-        return False
-    
     return True
 
 def get_available_simulations(simulations_dir):
@@ -196,10 +262,16 @@ Examples:
     print(f"🖥️  Server directory: {server_dir}")
     
     try:
-        # Clear any existing processes on port 22222
-        print("\n🧹 Checking for existing processes on port 22222...")
+        # Clear any existing processes on port 22222 before starting
+        print("\n🛑 Stopping any existing servers on port 22222...")
+        print("   This ensures a clean start for the new simulation")
         if not kill_processes_on_port("22222"):
             print("❌ Could not clear port 22222. Please manually stop any running servers.")
+            if platform.system().lower() == "windows":
+                print("   Try running: netstat -ano | findstr :22222")
+                print("   Then: taskkill /F /PID <process_id>")
+            else:
+                print("   Try running: sudo lsof -ti:22222 | xargs kill -9")
             return 1
         
         # Start the Go server
