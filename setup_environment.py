@@ -228,7 +228,7 @@ def setup_go_server():
     
     # Build the server
     print_info("Building Go server...")
-    if not run_command("go build -o ts2-sim-server .", cwd=server_dir):
+    if not run_command("go build -o ts2-sim-server main.go", cwd=server_dir):
         print_error("Failed to build Go server")
         return False
     
