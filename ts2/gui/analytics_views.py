@@ -1887,74 +1887,88 @@ class AuditLogsWidget(QtWidgets.QWidget):
         QtCore.QTimer.singleShot(0, lambda: self._provider.start(since_id=self._last_id, limit=500))
         
     def setupUI(self):
-        """Setup modern audit logs UI matching KPI dashboard design"""
+        """Setup audit logs UI matching System Status design"""
         main_layout = QtWidgets.QVBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
         
-        # Set modern background
+        # Set enhanced background with subtle gradient to match System Status
         self.setStyleSheet("""
             QWidget {
-                background-color: #f8fafc;
+                background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                    stop: 0 #fdfdfe, stop: 1 #f7f8fc);
                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             }
         """)
 
-        # Scrollable container
-        scroll = QtWidgets.QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QtWidgets.QFrame.NoFrame)
-        scroll.setStyleSheet("""
-            QScrollArea {
-                border: none;
-                background-color: #f8fafc;
-            }
-            QScrollBar:vertical {
-                background: #e2e8f0;
-                width: 8px;
-                border-radius: 4px;
-            }
-            QScrollBar::handle:vertical {
-                background: #cbd5e1;
-                border-radius: 4px;
-                min-height: 20px;
-            }
-            QScrollBar::handle:vertical:hover {
-                background: #94a3b8;
-            }
-        """)
-        
+        # Simple container without scroll to match System Status
         content = QtWidgets.QWidget()
         layout = QtWidgets.QVBoxLayout(content)
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(20)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(12)
         
-        # Modern controls row
+        # Header row matching System Status design
+        header_row = QtWidgets.QHBoxLayout()
+        
+        # Audit Logs label with clean styling
+        title_label = QtWidgets.QLabel("Audit Logs")
+        title_label.setStyleSheet("""
+            font-size: 18px; 
+            font-weight: 700; 
+            color: #1e293b;
+        """)
+        header_row.addWidget(title_label)
+        
+        header_row.addStretch()
+        
+        # Status dot indicator
+        status_dot = QtWidgets.QLabel("●")
+        self.status_dot = status_dot  # Store reference for updating
+        status_dot.setStyleSheet("""
+            color: #10b981; 
+            font-size: 12px;
+            margin-right: 4px;
+        """)
+        header_row.addWidget(status_dot)
+        
+        # Stream status indicator with enhanced styling
+        self.stream_indicator = QtWidgets.QLabel("Live • Streaming")
+        self.stream_indicator.setStyleSheet("""
+            color: #64748b; 
+            font-size: 12px; 
+            font-weight: 500;
+            background-color: #f1f5f9;
+            padding: 4px 8px;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+        """)
+        header_row.addWidget(self.stream_indicator)
+        
+        layout.addLayout(header_row)
+        
+        # Simplified controls row matching System Status layout
         controls_row = QtWidgets.QHBoxLayout()
         
-        # Search box
-        search_label = QtWidgets.QLabel("Search")
-        search_label.setStyleSheet("color: #64748b; font-weight: 500; font-size: 14px;")
-        controls_row.addWidget(search_label)
-        
+        # Search box (more compact)
         self.search_box = QtWidgets.QLineEdit()
-        self.search_box.setPlaceholderText("Search in logs...")
+        self.search_box.setPlaceholderText("Search logs...")
         self.search_box.setStyleSheet("""
             QLineEdit {
-                padding: 10px 16px;
-                border: 2px solid #e5e7eb;
-                border-radius: 10px;
+                padding: 8px 12px;
+                border: 1px solid #cbd5e1;
+                border-radius: 6px;
                 background-color: white;
-                font-size: 14px;
+                font-size: 13px;
                 font-weight: 500;
                 color: #1f2937;
-                min-width: 200px;
+                min-width: 180px;
+                max-width: 200px;
             }
             QLineEdit:hover {
-                border-color: #3b82f6;
+                border-color: #94a3b8;
                 background-color: #f8fafc;
             }
             QLineEdit:focus {
-                border-color: #3b82f6;
+                border-color: #6366f1;
                 background-color: white;
                 outline: none;
             }
@@ -1962,65 +1976,81 @@ class AuditLogsWidget(QtWidgets.QWidget):
         self.search_box.textChanged.connect(self.filterLogs)
         controls_row.addWidget(self.search_box)
         
-        controls_row.addSpacing(20)
-        
-        # Severity filter
-        severity_label = QtWidgets.QLabel("Severity")
-        severity_label.setStyleSheet("color: #64748b; font-weight: 500; font-size: 14px;")
-        controls_row.addWidget(severity_label)
-        
+        # Severity filter (more compact)
         self.severity_combo = QtWidgets.QComboBox()
         self.severity_combo.addItems(["All", "INFO", "WARNING", "ERROR", "NOTICE"])
-        self.severity_combo.setStyleSheet(self._getComboBoxStyle("#ef4444"))  # Red theme
+        self.severity_combo.setStyleSheet("""
+            QComboBox {
+                padding: 6px 10px;
+                border: 1px solid #cbd5e1;
+                border-radius: 6px;
+                background-color: white;
+                font-size: 13px;
+                font-weight: 500;
+                color: #1f2937;
+                min-width: 80px;
+            }
+            QComboBox:hover {
+                border-color: #94a3b8;
+                background-color: #f8fafc;
+            }
+            QComboBox:focus {
+                border-color: #ef4444;
+                background-color: white;
+            }
+        """)
         self.severity_combo.currentTextChanged.connect(self.filterLogs)
         controls_row.addWidget(self.severity_combo)
         
-        controls_row.addSpacing(20)
-        
-        # Category filter
-        category_label = QtWidgets.QLabel("Category")
-        category_label.setStyleSheet("color: #64748b; font-weight: 500; font-size: 14px;")
-        controls_row.addWidget(category_label)
-        
+        # Category filter (more compact)
         self.category_combo = QtWidgets.QComboBox()
         self.category_combo.addItems(["All", "route", "signal", "train", "system"])
-        self.category_combo.setStyleSheet(self._getComboBoxStyle("#8b5cf6"))  # Purple theme
+        self.category_combo.setStyleSheet("""
+            QComboBox {
+                padding: 6px 10px;
+                border: 1px solid #cbd5e1;
+                border-radius: 6px;
+                background-color: white;
+                font-size: 13px;
+                font-weight: 500;
+                color: #1f2937;
+                min-width: 80px;
+            }
+            QComboBox:hover {
+                border-color: #94a3b8;
+                background-color: #f8fafc;
+            }
+            QComboBox:focus {
+                border-color: #8b5cf6;
+                background-color: white;
+            }
+        """)
         self.category_combo.currentTextChanged.connect(self.filterLogs)
         controls_row.addWidget(self.category_combo)
         
-        controls_row.addSpacing(20)
-        
-        # Time range
-        time_label = QtWidgets.QLabel("Time Range")
-        time_label.setStyleSheet("color: #64748b; font-weight: 500; font-size: 14px;")
-        controls_row.addWidget(time_label)
-        
-        self.time_range_combo = QtWidgets.QComboBox()
-        self.time_range_combo.addItems(["All Time", "Last Hour", "Last 6 Hours", "Today", "Last 7 Days"])
-        self.time_range_combo.setStyleSheet(self._getComboBoxStyle("#10b981"))  # Green theme
-        self.time_range_combo.currentTextChanged.connect(self.filterLogs)
-        controls_row.addWidget(self.time_range_combo)
-        
         controls_row.addStretch()
         
-        # Action buttons
+        # Action buttons matching System Status style
         self.refresh_btn = QtWidgets.QPushButton("Refresh")
         self.refresh_btn.clicked.connect(self.refreshLogs)
         self.refresh_btn.setStyleSheet("""
             QPushButton {
-                background-color: #f3f4f6;
-                color: #374151;
-                border: 1px solid #d1d5db;
+                background-color: #ffffff;
+                color: #475569;
+                border: 1px solid #cbd5e1;
                 padding: 8px 16px;
                 border-radius: 8px;
-                font-weight: 500;
-                font-size: 14px;
+                font-weight: 600;
+                font-size: 13px;
+                min-width: 80px;
             }
             QPushButton:hover {
-                background-color: #e5e7eb;
+                background-color: #f8fafc;
+                border-color: #94a3b8;
+                color: #334155;
             }
             QPushButton:pressed {
-                background-color: #d1d5db;
+                background-color: #e2e8f0;
             }
         """)
         controls_row.addWidget(self.refresh_btn)
@@ -2035,7 +2065,8 @@ class AuditLogsWidget(QtWidgets.QWidget):
                 padding: 8px 16px;
                 border-radius: 8px;
                 font-weight: 600;
-                font-size: 14px;
+                font-size: 13px;
+                min-width: 80px;
             }
             QPushButton:hover {
                 background-color: #2563eb;
@@ -2048,58 +2079,25 @@ class AuditLogsWidget(QtWidgets.QWidget):
         
         layout.addLayout(controls_row)
         
-        # Modern table container
+        # Clean table container matching System Status
         table_container = QtWidgets.QWidget()
         table_container.setStyleSheet("""
             QWidget {
-                background-color: white;
+                background-color: #ffffff;
+                border: 1px solid #e1e7ef;
                 border-radius: 12px;
-                border: 1px solid #e5e7eb;
             }
         """)
         table_layout = QtWidgets.QVBoxLayout(table_container)
         table_layout.setContentsMargins(0, 0, 0, 0)
         
-        # Modern table
-        self.logs_table = QtWidgets.QTableWidget()
-        self.logs_table.setColumnCount(7)
-        self.logs_table.setHorizontalHeaderLabels(["ID", "Timestamp", "Event", "Category", "Object", "Details", "Severity"])
-        self.logs_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
-        self.logs_table.setAlternatingRowColors(True)
-        self.logs_table.setSortingEnabled(True)
-        self.logs_table.setStyleSheet("""
-            QTableWidget {
-                border: none;
-                border-radius: 12px;
-                background-color: white;
-                gridline-color: #f1f5f9;
-                font-size: 13px;
-            }
-            QTableWidget::item {
-                padding: 8px;
-                border-bottom: 1px solid #f1f5f9;
-            }
-            QTableWidget::item:selected {
-                background-color: #e5e7eb;
-                color: #111827;
-            }
-            QHeaderView::section {
-                background-color: #f8fafc;
-                padding: 12px 8px;
-                border: none;
-                border-bottom: 2px solid #e5e7eb;
-                font-weight: 600;
-                color: #374151;
-            }
-            QTableWidget::item:alternate {
-                background-color: #f9fafb;
-            }
-        """)
+        # Create table matching System Status design
+        self.logs_table = self._create_logs_table()
         table_layout.addWidget(self.logs_table)
         
         layout.addWidget(table_container)
         
-        # Modern status info
+        # Status info matching System Status design
         self.status_label = QtWidgets.QLabel()
         self.status_label.setStyleSheet("""
             color: #9ca3af; 
@@ -2109,8 +2107,115 @@ class AuditLogsWidget(QtWidgets.QWidget):
         """)
         layout.addWidget(self.status_label)
         
-        scroll.setWidget(content)
-        main_layout.addWidget(scroll)
+        main_layout.addWidget(content)
+        
+    def _create_logs_table(self):
+        """Create logs table matching System Status design"""
+        table = QtWidgets.QTableWidget()
+        table.setColumnCount(7)
+        table.setHorizontalHeaderLabels(["ID", "Timestamp", "Event", "Category", "Object", "Details", "Level"])
+        
+        # Apply System Status table styling
+        table.setStyleSheet("""
+            QTableWidget {
+                border: none;
+                background-color: white;
+                gridline-color: #f1f5f9;
+                font-size: 13px;
+                selection-background-color: #eff6ff;
+                border-radius: 6px;
+            }
+            QHeaderView {
+                border: none;
+                background-color: transparent;
+            }
+            QHeaderView::section {
+                background-color: #f8fafc;
+                padding: 12px;
+                border: none;
+                border-bottom: 2px solid #e2e8f0;
+                font-weight: 600;
+                color: #475569;
+                font-size: 13px;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }
+            QHeaderView::section:horizontal {
+                border-right: 1px solid #f1f5f9;
+            }
+            QHeaderView::section:last {
+                border-right: none;
+            }
+            QScrollBar:vertical {
+                background: #f1f5f9;
+                width: 10px;
+                border-radius: 5px;
+                margin: 0;
+            }
+            QScrollBar::handle:vertical {
+                background: #cbd5e1;
+                border-radius: 5px;
+                min-height: 20px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background: #94a3b8;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0px;
+            }
+            QScrollBar:horizontal {
+                background: #f1f5f9;
+                height: 10px;
+                border-radius: 5px;
+                margin: 0;
+            }
+            QScrollBar::handle:horizontal {
+                background: #cbd5e1;
+                border-radius: 5px;
+                min-width: 20px;
+            }
+            QScrollBar::handle:horizontal:hover {
+                background: #94a3b8;
+            }
+            QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+                width: 0px;
+            }
+        """)
+        
+        # Enhanced table properties matching System Status
+        table.setShowGrid(True)
+        table.setAlternatingRowColors(False)  # Disable to avoid overriding colors
+        table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+        table.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+        table.setVerticalScrollMode(QtWidgets.QAbstractItemView.ScrollPerPixel)
+        table.setHorizontalScrollMode(QtWidgets.QAbstractItemView.ScrollPerPixel)
+        table.setSortingEnabled(True)
+        
+        # Modern header styling
+        header = table.horizontalHeader()
+        header.setDefaultSectionSize(120)
+        header.setMinimumSectionSize(80)
+        header.setCascadingSectionResizes(False)
+        header.setHighlightSections(False)
+        header.setStretchLastSection(False)
+        
+        # Vertical header styling
+        v_header = table.verticalHeader()
+        v_header.setVisible(False)  # Hide row numbers for cleaner look
+        
+        return table
+        
+    def _set_default_item_style(self, item, is_data_item=False):
+        """Set default styling for table items"""
+        if is_data_item:
+            # For data items (non-severity), use default colors
+            item.setForeground(QtGui.QColor("#1e293b"))
+            item.setBackground(QtGui.QColor("transparent"))
+        # Add consistent font styling
+        font = item.font()
+        font.setPixelSize(13)
+        font.setWeight(QtGui.QFont.Medium)
+        item.setFont(font)
         
     def _getComboBoxStyle(self, accent_color):
         """Get consistent combo box styling with accent color"""
@@ -2218,50 +2323,80 @@ class AuditLogsWidget(QtWidgets.QWidget):
         self.updateLogsTable()
         
     def updateLogsTable(self):
-        """Update the logs table display"""
+        """Update the logs table display with modern styling"""
         self.logs_table.setRowCount(len(self.filtered_logs))
 
         for row, log in enumerate(self.filtered_logs):
             # ID (serial number)
             id_text = log.get('id', '') or str(row + 1)
             id_item = QtWidgets.QTableWidgetItem(id_text)
-            id_item.setFont(QtGui.QFont("monospace", 10))
-            id_item.setTextAlignment(Qt.AlignCenter)
+            id_item.setFont(QtGui.QFont("monospace"))
+            self._set_default_item_style(id_item, is_data_item=True)
+            id_item.setTextAlignment(QtCore.Qt.AlignCenter)
             id_item.setForeground(QtGui.QColor("#6b7280"))
             self.logs_table.setItem(row, 0, id_item)
 
             # Timestamp
             ts_text = log.get('timestamp', '')
-            timestamp = QtWidgets.QTableWidgetItem(ts_text)
-            self.logs_table.setItem(row, 1, timestamp)
+            timestamp_item = QtWidgets.QTableWidgetItem(ts_text)
+            timestamp_item.setFont(QtGui.QFont("monospace"))
+            self._set_default_item_style(timestamp_item, is_data_item=True)
+            timestamp_item.setForeground(QtGui.QColor("#6b7280"))
+            self.logs_table.setItem(row, 1, timestamp_item)
 
             # Event
             event_text = log.get('event', '')
-            self.logs_table.setItem(row, 2, QtWidgets.QTableWidgetItem(event_text))
+            event_item = QtWidgets.QTableWidgetItem(event_text)
+            self._set_default_item_style(event_item, is_data_item=True)
+            self.logs_table.setItem(row, 2, event_item)
 
-            # Category
+            # Category with subtle styling
             cat_text = log.get('category', '')
-            self.logs_table.setItem(row, 3, QtWidgets.QTableWidgetItem(cat_text))
+            category_item = QtWidgets.QTableWidgetItem(cat_text)
+            self._set_default_item_style(category_item, is_data_item=True)
+            category_item.setForeground(QtGui.QColor("#6b7280"))
+            self.logs_table.setItem(row, 3, category_item)
 
             # Object (compact)
             obj_text = log.get('object', '')
-            self.logs_table.setItem(row, 4, QtWidgets.QTableWidgetItem(obj_text))
+            object_item = QtWidgets.QTableWidgetItem(obj_text)
+            object_item.setFont(QtGui.QFont("monospace"))
+            self._set_default_item_style(object_item, is_data_item=True)
+            object_item.setForeground(QtGui.QColor("#6b7280"))
+            self.logs_table.setItem(row, 4, object_item)
 
             # Details (pretty)
             det_text = log.get('details', '')
-            self.logs_table.setItem(row, 5, QtWidgets.QTableWidgetItem(det_text))
+            details_item = QtWidgets.QTableWidgetItem(det_text)
+            self._set_default_item_style(details_item, is_data_item=True)
+            self.logs_table.setItem(row, 5, details_item)
 
-            # Severity with color coding
+            # Severity with enhanced badge-style color coding matching System Status
             sev = (log.get('severity') or '').upper()
-            severity_item = QtWidgets.QTableWidgetItem(sev)
-            if sev == 'ERROR':
-                severity_item.setBackground(QtGui.QColor(255, 200, 200))
-            elif sev == 'WARNING' or sev == 'WARN':
-                severity_item.setBackground(QtGui.QColor(255, 255, 200))
-            elif sev == 'INFO':
-                severity_item.setBackground(QtGui.QColor(200, 255, 200))
-            elif sev == 'NOTICE':
-                severity_item.setBackground(QtGui.QColor(220, 220, 255))
+            severity_item = QtWidgets.QTableWidgetItem(f" {sev} ")
+            severity_font = QtGui.QFont()
+            severity_font.setBold(True)
+            severity_font.setPixelSize(10)
+            severity_item.setFont(severity_font)
+            severity_item.setTextAlignment(QtCore.Qt.AlignCenter)
+            
+            # Enhanced color coding for audit log severity levels
+            if sev in ['ERROR', 'CRITICAL', 'FATAL']:
+                severity_item.setForeground(QtGui.QColor("#991b1b"))  # Darker red
+                severity_item.setBackground(QtGui.QColor("#fee2e2"))  # Soft red
+            elif sev in ['WARNING', 'WARN', 'CAUTION']:
+                severity_item.setForeground(QtGui.QColor("#92400e"))  # Darker amber
+                severity_item.setBackground(QtGui.QColor("#fef3c7"))  # Soft amber
+            elif sev in ['INFO', 'INFORMATION']:
+                severity_item.setForeground(QtGui.QColor("#065f46"))  # Darker green
+                severity_item.setBackground(QtGui.QColor("#d1fae5"))  # Soft green
+            elif sev in ['NOTICE', 'DEBUG', 'TRACE']:
+                severity_item.setForeground(QtGui.QColor("#1e3a8a"))  # Blue
+                severity_item.setBackground(QtGui.QColor("#dbeafe"))  # Light blue
+            else:
+                severity_item.setForeground(QtGui.QColor("#374151"))  # Default gray
+                severity_item.setBackground(QtGui.QColor("#f3f4f6"))  # Light gray
+                
             self.logs_table.setItem(row, 6, severity_item)
             
         self.logs_table.resizeColumnsToContents()
@@ -2403,3 +2538,58 @@ class AuditLogsWidget(QtWidgets.QWidget):
         if error:
             parts.append(f"Error: {error}")
         self.status_label.setText(" | ".join(parts))
+        
+        # Update header status indicators
+        if connected is not None:
+            if connected:
+                # Connected - green dot and "Live • Streaming"
+                self.status_dot.setStyleSheet("""
+                    color: #10b981; 
+                    font-size: 12px;
+                    margin-right: 4px;
+                """)
+                self.stream_indicator.setText("Live • Streaming")
+                self.stream_indicator.setStyleSheet("""
+                    color: #64748b; 
+                    font-size: 12px; 
+                    font-weight: 500;
+                    background-color: #f1f5f9;
+                    padding: 4px 8px;
+                    border-radius: 12px;
+                    border: 1px solid #e2e8f0;
+                """)
+            else:
+                # Disconnected - red dot and "Offline"
+                self.status_dot.setStyleSheet("""
+                    color: #ef4444; 
+                    font-size: 12px;
+                    margin-right: 4px;
+                """)
+                self.stream_indicator.setText("Offline")
+                self.stream_indicator.setStyleSheet("""
+                    color: #dc2626; 
+                    font-size: 12px; 
+                    font-weight: 500;
+                    background-color: #fef2f2;
+                    padding: 4px 8px;
+                    border-radius: 12px;
+                    border: 1px solid #fecaca;
+                """)
+        
+        if error:
+            # Error - orange dot and error message
+            self.status_dot.setStyleSheet("""
+                color: #f59e0b; 
+                font-size: 12px;
+                margin-right: 4px;
+            """)
+            self.stream_indicator.setText("Error")
+            self.stream_indicator.setStyleSheet("""
+                color: #d97706; 
+                font-size: 12px; 
+                font-weight: 500;
+                background-color: #fffbeb;
+                padding: 4px 8px;
+                border-radius: 12px;
+                border: 1px solid #fed7aa;
+            """)

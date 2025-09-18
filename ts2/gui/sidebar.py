@@ -999,7 +999,7 @@ class TrainManagementWidget(QtWidgets.QWidget):
         
         # Enhanced table properties
         table.setShowGrid(True)
-        table.setAlternatingRowColors(True)
+        table.setAlternatingRowColors(False)  # Disable to avoid overriding colors
         table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         table.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
         table.setVerticalScrollMode(QtWidgets.QAbstractItemView.ScrollPerPixel)
@@ -1249,14 +1249,15 @@ class SystemStatusWidget(QtWidgets.QWidget):
         self.refresh_timer.start(3000)
         
     def setupUI(self):
-        """Setup minimal system status UI"""
+        """Setup enhanced system status UI with modern styling"""
         main_layout = QtWidgets.QVBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
         
-        # Set clean background
+        # Set enhanced background with subtle gradient
         self.setStyleSheet("""
             QWidget {
-                background-color: #fafafa;
+                background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                    stop: 0 #fdfdfe, stop: 1 #f7f8fc);
                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             }
         """)
@@ -1270,71 +1271,106 @@ class SystemStatusWidget(QtWidgets.QWidget):
         # Minimal header row
         header_row = QtWidgets.QHBoxLayout()
         
-        # System status label
+        # System status label with clean styling
         status_label = QtWidgets.QLabel("System Status")
         status_label.setStyleSheet("""
-            font-size: 16px; 
-            font-weight: 600; 
-            color: #374151;
+            font-size: 18px; 
+            font-weight: 700; 
+            color: #1e293b;
         """)
         header_row.addWidget(status_label)
         
         header_row.addStretch()
         
-        # Auto-refresh indicator
-        refresh_indicator = QtWidgets.QLabel("Auto-refresh: 3s")
+        # Status dot indicator
+        status_dot = QtWidgets.QLabel("●")
+        status_dot.setStyleSheet("""
+            color: #10b981; 
+            font-size: 12px;
+            margin-right: 4px;
+        """)
+        header_row.addWidget(status_dot)
+        
+        # Auto-refresh indicator with enhanced styling
+        refresh_indicator = QtWidgets.QLabel("Live • 3s refresh")
         refresh_indicator.setStyleSheet("""
-            color: #9ca3af; 
-            font-size: 11px; 
-            font-weight: 400;
+            color: #64748b; 
+            font-size: 12px; 
+            font-weight: 500;
+            background-color: #f1f5f9;
+            padding: 4px 8px;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
         """)
         header_row.addWidget(refresh_indicator)
         
         layout.addLayout(header_row)
         
-        # Compact KPI strip
+        # Simplified KPI strip
         kpi_container = QtWidgets.QWidget()
         kpi_container.setStyleSheet("""
             QWidget {
-                background-color: white;
-                border: 1px solid #e5e7eb;
-                border-radius: 6px;
+                background-color: transparent;
             }
         """)
         kpi_layout = QtWidgets.QHBoxLayout(kpi_container)
-        kpi_layout.setContentsMargins(12, 12, 12, 12)
-        kpi_layout.setSpacing(24)
+        kpi_layout.setContentsMargins(0, 0, 0, 0)
+        kpi_layout.setSpacing(16)
         
-        def _create_compact_kpi(title):
+        def _create_compact_kpi(title, color_accent="#6366f1"):
             kpi_widget = QtWidgets.QWidget()
             kpi_widget_layout = QtWidgets.QVBoxLayout(kpi_widget)
             kpi_widget_layout.setContentsMargins(0, 0, 0, 0)
-            kpi_widget_layout.setSpacing(2)
+            kpi_widget_layout.setSpacing(4)
             
-            # Title
+            # Clean styling without borders or backgrounds
+            kpi_widget.setStyleSheet(f"""
+                QWidget {{
+                    background-color: transparent;
+                }}
+            """)
+            
+            # Title with icon-style indicator
+            title_container = QtWidgets.QHBoxLayout()
+            title_indicator = QtWidgets.QLabel("◆")
+            title_indicator.setStyleSheet(f"""
+                color: {color_accent};
+                font-size: 8px;
+                margin-right: 4px;
+            """)
+            
             title_label = QtWidgets.QLabel(title)
             title_label.setStyleSheet("""
                 font-size: 11px; 
-                color: #6b7280; 
-                font-weight: 500;
+                color: #475569; 
+                font-weight: 600;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
             """)
-            kpi_widget_layout.addWidget(title_label)
             
-            # Value
+            title_container.addWidget(title_indicator)
+            title_container.addWidget(title_label)
+            title_container.addStretch()
+            
+            kpi_widget_layout.addLayout(title_container)
+            
+            # Value with enhanced styling
             value_label = QtWidgets.QLabel("-")
-            value_label.setStyleSheet("""
-                font-size: 18px; 
-                font-weight: 600; 
-                color: #111827;
+            value_label.setStyleSheet(f"""
+                font-size: 20px; 
+                font-weight: 700; 
+                color: #0f172a;
+                margin-top: 2px;
             """)
             kpi_widget_layout.addWidget(value_label)
             
             return kpi_widget, value_label
         
-        util_widget, self.kpi_util_value = _create_compact_kpi("Utilization")
-        trains_widget, self.kpi_trains_value = _create_compact_kpi("Active Trains")
-        signals_widget, self.kpi_signals_value = _create_compact_kpi("Signals")
-        routes_widget, self.kpi_routes_value = _create_compact_kpi("Routes")
+        # Create KPIs with different accent colors
+        util_widget, self.kpi_util_value = _create_compact_kpi("Utilization", "#6366f1")
+        trains_widget, self.kpi_trains_value = _create_compact_kpi("Active Trains", "#10b981")
+        signals_widget, self.kpi_signals_value = _create_compact_kpi("Signals", "#f59e0b")
+        routes_widget, self.kpi_routes_value = _create_compact_kpi("Routes", "#ef4444")
         
         kpi_layout.addWidget(util_widget)
         kpi_layout.addWidget(trains_widget)
@@ -1349,23 +1385,25 @@ class SystemStatusWidget(QtWidgets.QWidget):
         
         self.refresh_btn = QtWidgets.QPushButton("Refresh")
         
-        # Apply minimal button styling
+        # Apply clean button styling
         button_style = """
             QPushButton {
-                background-color: white;
-                color: #374151;
-                border: 1px solid #d1d5db;
-                padding: 6px 12px;
-                border-radius: 4px;
-                font-weight: 500;
+                background-color: #ffffff;
+                color: #475569;
+                border: 1px solid #cbd5e1;
+                padding: 8px 16px;
+                border-radius: 8px;
+                font-weight: 600;
                 font-size: 13px;
+                min-width: 80px;
             }
             QPushButton:hover {
-                background-color: #f9fafb;
-                border-color: #9ca3af;
+                background-color: #f8fafc;
+                border-color: #94a3b8;
+                color: #334155;
             }
             QPushButton:pressed {
-                background-color: #f3f4f6;
+                background-color: #e2e8f0;
             }
         """
         
@@ -1378,61 +1416,71 @@ class SystemStatusWidget(QtWidgets.QWidget):
             
         layout.addLayout(actions_row)
         
-        # Simple tables container
+        # Clean tables container
         tables_container = QtWidgets.QWidget()
         tables_container.setStyleSheet("""
             QWidget {
-                background-color: white;
-                border: 1px solid #e5e7eb;
-                border-radius: 6px;
+                background-color: #ffffff;
+                border: 1px solid #e1e7ef;
+                border-radius: 12px;
             }
         """)
         tables_layout = QtWidgets.QVBoxLayout(tables_container)
         tables_layout.setContentsMargins(0, 0, 0, 0)
         
-        # Enhanced modern tabs
+        # Enhanced modern tabs with subtle gradients and animations
         self.tabs = QtWidgets.QTabWidget()
         self.tabs.setStyleSheet("""
             QTabWidget::pane {
                 border: none;
-                background-color: white;
-                border-radius: 6px;
+                background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                    stop: 0 #ffffff, stop: 1 #fdfdfe);
+                border-radius: 8px;
             }
             QTabWidget::tab-bar {
                 alignment: left;
+                background: transparent;
             }
             QTabBar {
                 qproperty-drawBase: 0;
                 border: none;
-                background-color: transparent;
+                background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                    stop: 0 #f8fafc, stop: 1 #f1f5f9);
+                border-top-left-radius: 12px;
+                border-top-right-radius: 12px;
             }
             QTabBar::tab {
-                background-color: #f8fafc;
+                background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                    stop: 0 #f1f5f9, stop: 1 #e2e8f0);
                 color: #64748b;
-                padding: 12px 20px;
-                margin-right: 2px;
+                padding: 14px 24px;
+                margin-right: 1px;
                 margin-bottom: 0px;
-                border-top-left-radius: 8px;
-                border-top-right-radius: 8px;
-                border-bottom: 2px solid transparent;
+                border-top-left-radius: 10px;
+                border-top-right-radius: 10px;
+                border-bottom: 3px solid transparent;
                 font-weight: 500;
-                font-size: 14px;
-                min-width: 80px;
+                font-size: 13px;
+                min-width: 90px;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
             }
             QTabBar::tab:selected {
-                background-color: white;
+                background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                    stop: 0 #ffffff, stop: 1 #f8fafc);
                 color: #1e293b;
-                font-weight: 600;
-                border-bottom: 2px solid #3b82f6;
+                font-weight: 700;
+                border-bottom: 3px solid #6366f1;
                 margin-top: 0px;
             }
             QTabBar::tab:hover:!selected {
-                background-color: #f1f5f9;
+                background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                    stop: 0 #e2e8f0, stop: 1 #cbd5e1);
                 color: #475569;
-                border-bottom: 2px solid #cbd5e1;
+                border-bottom: 3px solid #94a3b8;
             }
             QTabBar::tab:first {
-                margin-left: 8px;
+                margin-left: 12px;
             }
         """)
         
@@ -1471,21 +1519,6 @@ class SystemStatusWidget(QtWidgets.QWidget):
                 selection-background-color: #eff6ff;
                 border-radius: 6px;
             }
-            QTableWidget::item {
-                padding: 10px 12px;
-                border-bottom: 1px solid #f1f5f9;
-                color: #1e293b;
-                font-weight: 500;
-            }
-            QTableWidget::item:selected {
-                background-color: #eff6ff;
-                color: #1e40af;
-                border: none;
-            }
-            QTableWidget::item:hover {
-                background-color: #f8fafc;
-                color: #0f172a;
-            }
             QHeaderView {
                 border: none;
                 background-color: transparent;
@@ -1506,9 +1539,6 @@ class SystemStatusWidget(QtWidgets.QWidget):
             }
             QHeaderView::section:last {
                 border-right: none;
-            }
-            QTableWidget::item:alternate {
-                background-color: #f9fafb;
             }
             QScrollBar:vertical {
                 background: #f1f5f9;
@@ -1548,7 +1578,7 @@ class SystemStatusWidget(QtWidgets.QWidget):
         
         # Enhanced table properties
         table.setShowGrid(True)
-        table.setAlternatingRowColors(True)
+        table.setAlternatingRowColors(False)  # Disable to avoid overriding colors
         table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         table.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
         table.setVerticalScrollMode(QtWidgets.QAbstractItemView.ScrollPerPixel)
@@ -1567,6 +1597,18 @@ class SystemStatusWidget(QtWidgets.QWidget):
         v_header.setVisible(False)  # Hide row numbers for cleaner look
         
         return table
+        
+    def _set_default_item_style(self, item, is_data_item=False):
+        """Set default styling for table items"""
+        if is_data_item:
+            # For data items (non-status), use default colors
+            item.setForeground(QtGui.QColor("#1e293b"))
+            item.setBackground(QtGui.QColor("transparent"))
+        # Add padding through font metrics (Qt doesn't support CSS padding on items)
+        font = item.font()
+        font.setPixelSize(13)
+        font.setWeight(QtGui.QFont.Medium)
+        item.setFont(font)
         
     def _http(self):
         import requests
@@ -1668,6 +1710,7 @@ class SystemStatusWidget(QtWidgets.QWidget):
         active = trains_tot.get('active') if isinstance(trains_tot, dict) else None
         total = trains_tot.get('total') if isinstance(trains_tot, dict) else None
         self.kpi_util_value.setText(util_text)
+        
         if active is not None and total is not None:
             self.kpi_trains_value.setText(f"{active} / {total}")
         else:
@@ -1698,35 +1741,52 @@ class SystemStatusWidget(QtWidgets.QWidget):
             # Signal ID
             id_item = QtWidgets.QTableWidgetItem(signal['id'])
             id_item.setFont(QtGui.QFont("monospace"))  # Monospace for IDs
+            self._set_default_item_style(id_item, is_data_item=True)
             self.signals_table.setItem(row, 0, id_item)
             
             # Name
-            self.signals_table.setItem(row, 1, QtWidgets.QTableWidgetItem(signal['name']))
+            name_item = QtWidgets.QTableWidgetItem(signal['name'])
+            self._set_default_item_style(name_item, is_data_item=True)
+            self.signals_table.setItem(row, 1, name_item)
             
-            # Status with modern color coding
-            status_item = QtWidgets.QTableWidgetItem(signal['status'])
-            status_item.setFont(QtGui.QFont())
-            status_item.font().setBold(True)
+            # Status with enhanced badge-style color coding
+            status_text = signal['status']
+            status_item = QtWidgets.QTableWidgetItem(f" {status_text} ")
+            status_font = QtGui.QFont()
+            status_font.setBold(True)
+            status_font.setPixelSize(11)
+            status_item.setFont(status_font)
+            status_item.setTextAlignment(QtCore.Qt.AlignCenter)
             
-            if signal['status'] == 'GREEN':
-                status_item.setForeground(QtGui.QColor("#10b981"))  # Modern green
-                status_item.setBackground(QtGui.QColor("#ecfdf5"))  # Light green bg
-            elif signal['status'] == 'RED':
-                status_item.setForeground(QtGui.QColor("#ef4444"))  # Modern red
-                status_item.setBackground(QtGui.QColor("#fef2f2"))  # Light red bg
-            elif signal['status'] == 'YELLOW':
-                status_item.setForeground(QtGui.QColor("#f59e0b"))  # Modern amber
-                status_item.setBackground(QtGui.QColor("#fffbeb"))  # Light amber bg
+            # Enhanced color coding for various signal states
+            status_upper = status_text.upper()
+            if status_upper in ['GREEN', 'CLEAR', 'PROCEED', 'GO']:
+                status_item.setForeground(QtGui.QColor("#065f46"))  # Darker green text
+                status_item.setBackground(QtGui.QColor("#d1fae5"))  # Soft green bg
+            elif status_upper in ['RED', 'DANGER', 'STOP', 'BLOCKED']:
+                status_item.setForeground(QtGui.QColor("#991b1b"))  # Darker red text
+                status_item.setBackground(QtGui.QColor("#fee2e2"))  # Soft red bg
+            elif status_upper in ['YELLOW', 'CAUTION', 'APPROACH', 'SLOW']:
+                status_item.setForeground(QtGui.QColor("#92400e"))  # Darker amber text
+                status_item.setBackground(QtGui.QColor("#fef3c7"))  # Soft amber bg
+            elif status_upper in ['BLUE', 'SHUNT', 'ROUTE']:
+                status_item.setForeground(QtGui.QColor("#1e3a8a"))  # Blue text
+                status_item.setBackground(QtGui.QColor("#dbeafe"))  # Light blue bg
+            else:
+                status_item.setForeground(QtGui.QColor("#374151"))
+                status_item.setBackground(QtGui.QColor("#f3f4f6"))
                 
             self.signals_table.setItem(row, 2, status_item)
             
             # Type
             type_item = QtWidgets.QTableWidgetItem(signal['type'])
+            self._set_default_item_style(type_item, is_data_item=True)
             type_item.setForeground(QtGui.QColor("#6b7280"))  # Subtle gray
             self.signals_table.setItem(row, 3, type_item)
             
             # Last Changed
             time_item = QtWidgets.QTableWidgetItem(signal['lastChanged'])
+            self._set_default_item_style(time_item, is_data_item=True)
             time_item.setForeground(QtGui.QColor("#6b7280"))  # Subtle gray
             time_item.setFont(QtGui.QFont("monospace"))  # Monospace for time
             self.signals_table.setItem(row, 4, time_item)
@@ -1776,20 +1836,54 @@ class SystemStatusWidget(QtWidgets.QWidget):
             code_item.setForeground(QtGui.QColor("#6b7280"))
             self.tracks_table.setItem(row, 4, code_item)
             
-            # Occupied status with color coding
+            # Enhanced occupied status with comprehensive color coding
             occ = t.get('occupied')
-            occ_text = "Yes" if occ is True else ("No" if occ is False else "-")
-            occ_item = QtWidgets.QTableWidgetItem(occ_text)
-            occ_item.font().setBold(True)
-            
-            if occ is True:
-                occ_item.setForeground(QtGui.QColor("#ef4444"))  # Red for occupied
-                occ_item.setBackground(QtGui.QColor("#fef2f2"))
-            elif occ is False:
-                occ_item.setForeground(QtGui.QColor("#10b981"))  # Green for free
-                occ_item.setBackground(QtGui.QColor("#ecfdf5"))
+            # Handle string values for occupied status
+            if isinstance(occ, str):
+                occ_upper = occ.upper()
+                if occ_upper in ['TRUE', 'OCCUPIED', 'BLOCKED', 'ENGAGED']:
+                    occ_text = "OCCUPIED"
+                    occ_color_fg = "#991b1b"  # Red
+                    occ_color_bg = "#fee2e2"
+                elif occ_upper in ['FALSE', 'FREE', 'CLEAR', 'AVAILABLE']:
+                    occ_text = "FREE"
+                    occ_color_fg = "#065f46"  # Green
+                    occ_color_bg = "#d1fae5"
+                elif occ_upper in ['RESERVED', 'PERSISTENT', 'HELD']:
+                    occ_text = "RESERVED"
+                    occ_color_fg = "#1e3a8a"  # Blue
+                    occ_color_bg = "#dbeafe"
+                elif occ_upper in ['MAINTENANCE', 'OUT_OF_SERVICE']:
+                    occ_text = "MAINTENANCE"
+                    occ_color_fg = "#7c2d12"  # Brown
+                    occ_color_bg = "#fef7ed"
+                else:
+                    occ_text = occ_upper
+                    occ_color_fg = "#374151"  # Gray
+                    occ_color_bg = "#f3f4f6"
             else:
-                occ_item.setForeground(QtGui.QColor("#6b7280"))  # Gray for unknown
+                # Handle boolean values
+                if occ is True:
+                    occ_text = "OCCUPIED"
+                    occ_color_fg = "#991b1b"  # Red
+                    occ_color_bg = "#fee2e2"
+                elif occ is False:
+                    occ_text = "FREE"
+                    occ_color_fg = "#065f46"  # Green
+                    occ_color_bg = "#d1fae5"
+                else:
+                    occ_text = "UNKNOWN"
+                    occ_color_fg = "#374151"  # Gray
+                    occ_color_bg = "#f3f4f6"
+            
+            occ_item = QtWidgets.QTableWidgetItem(f" {occ_text} ")
+            occ_font = QtGui.QFont()
+            occ_font.setBold(True)
+            occ_font.setPixelSize(10)
+            occ_item.setFont(occ_font)
+            occ_item.setTextAlignment(QtCore.Qt.AlignCenter)
+            occ_item.setForeground(QtGui.QColor(occ_color_fg))
+            occ_item.setBackground(QtGui.QColor(occ_color_bg))
                 
             self.tracks_table.setItem(row, 5, occ_item)
             
@@ -1827,36 +1921,53 @@ class SystemStatusWidget(QtWidgets.QWidget):
             end_item.setForeground(QtGui.QColor("#6b7280"))
             self.routes_table.setItem(row, 2, end_item)
             
-            # State with color coding
-            state_text = str(r.get('state', ''))
-            state_item = QtWidgets.QTableWidgetItem(state_text)
-            state_item.font().setBold(True)
+            # Enhanced state with badge-style color coding
+            state_text = str(r.get('state', '')).upper()
+            state_item = QtWidgets.QTableWidgetItem(f" {state_text} ")
+            state_font = QtGui.QFont()
+            state_font.setBold(True)
+            state_font.setPixelSize(10)
+            state_item.setFont(state_font)
+            state_item.setTextAlignment(QtCore.Qt.AlignCenter)
             
-            if state_text.upper() in ['ACTIVE', 'LOCKED']:
-                state_item.setForeground(QtGui.QColor("#10b981"))  # Green
-                state_item.setBackground(QtGui.QColor("#ecfdf5"))
-            elif state_text.upper() in ['INACTIVE', 'UNLOCKED']:
-                state_item.setForeground(QtGui.QColor("#6b7280"))  # Gray
-            elif state_text.upper() in ['ERROR', 'FAILED']:
-                state_item.setForeground(QtGui.QColor("#ef4444"))  # Red
-                state_item.setBackground(QtGui.QColor("#fef2f2"))
+            # Enhanced color coding for various route states
+            if state_text in ['ACTIVE', 'LOCKED', 'ACTIVATED', 'SET', 'ENGAGED']:
+                state_item.setForeground(QtGui.QColor("#065f46"))  # Darker green
+                state_item.setBackground(QtGui.QColor("#d1fae5"))  # Soft green
+            elif state_text in ['INACTIVE', 'UNLOCKED', 'DEACTIVATED', 'FREE', 'CLEAR']:
+                state_item.setForeground(QtGui.QColor("#374151"))  # Dark gray
+                state_item.setBackground(QtGui.QColor("#f3f4f6"))  # Light gray
+            elif state_text in ['ERROR', 'FAILED', 'FAULT', 'CONFLICT']:
+                state_item.setForeground(QtGui.QColor("#991b1b"))  # Darker red
+                state_item.setBackground(QtGui.QColor("#fee2e2"))  # Soft red
+            elif state_text in ['PENDING', 'WAITING', 'REQUEST', 'PARTIAL']:
+                state_item.setForeground(QtGui.QColor("#92400e"))  # Darker amber
+                state_item.setBackground(QtGui.QColor("#fef3c7"))  # Soft amber
+            elif state_text in ['PERSISTENT', 'HELD', 'RESERVED']:
+                state_item.setForeground(QtGui.QColor("#1e3a8a"))  # Blue
+                state_item.setBackground(QtGui.QColor("#dbeafe"))  # Light blue
             else:
-                state_item.setForeground(QtGui.QColor("#f59e0b"))  # Amber for unknown
-                state_item.setBackground(QtGui.QColor("#fffbeb"))
+                state_item.setForeground(QtGui.QColor("#6b7280"))  # Default gray
+                state_item.setBackground(QtGui.QColor("#f9fafb"))  # Light gray
                 
             self.routes_table.setItem(row, 3, state_item)
             
-            # Active status
+            # Enhanced active status with badge styling
             act = r.get('isActive')
-            act_text = "Yes" if act else "No"
-            act_item = QtWidgets.QTableWidgetItem(act_text)
-            act_item.font().setBold(True)
+            act_text = "ACTIVE" if act else "INACTIVE"
+            act_item = QtWidgets.QTableWidgetItem(f" {act_text} ")
+            act_font = QtGui.QFont()
+            act_font.setBold(True)
+            act_font.setPixelSize(10)
+            act_item.setFont(act_font)
+            act_item.setTextAlignment(QtCore.Qt.AlignCenter)
             
             if act:
-                act_item.setForeground(QtGui.QColor("#10b981"))  # Green for active
-                act_item.setBackground(QtGui.QColor("#ecfdf5"))
+                act_item.setForeground(QtGui.QColor("#065f46"))  # Darker green for active
+                act_item.setBackground(QtGui.QColor("#d1fae5"))  # Soft green bg
             else:
-                act_item.setForeground(QtGui.QColor("#6b7280"))  # Gray for inactive
+                act_item.setForeground(QtGui.QColor("#374151"))  # Dark gray for inactive
+                act_item.setBackground(QtGui.QColor("#f3f4f6"))  # Light gray bg
                 
             self.routes_table.setItem(row, 4, act_item)
             
@@ -1879,46 +1990,66 @@ class SystemStatusWidget(QtWidgets.QWidget):
             # Train ID with monospace
             id_item = QtWidgets.QTableWidgetItem(str(tr.get('id', '')))
             id_item.setFont(QtGui.QFont("monospace"))
+            self._set_default_item_style(id_item, is_data_item=True)
             self.trains_table.setItem(row, 0, id_item)
             
             # Service Code with monospace
             service_item = QtWidgets.QTableWidgetItem(str(tr.get('serviceCode', '')))
             service_item.setFont(QtGui.QFont("monospace"))
+            self._set_default_item_style(service_item, is_data_item=True)
             service_item.setForeground(QtGui.QColor("#6b7280"))
             self.trains_table.setItem(row, 1, service_item)
             
-            # Status with color coding
-            status_text = str(tr.get('status', ''))
-            status_item = QtWidgets.QTableWidgetItem(status_text)
-            status_item.font().setBold(True)
+            # Enhanced status with badge-style color coding
+            status_text = str(tr.get('status', '')).upper()
+            status_item = QtWidgets.QTableWidgetItem(f" {status_text} ")
+            status_font = QtGui.QFont()
+            status_font.setBold(True)
+            status_font.setPixelSize(10)
+            status_item.setFont(status_font)
+            status_item.setTextAlignment(QtCore.Qt.AlignCenter)
             
-            if status_text.upper() in ['RUNNING', 'MOVING']:
-                status_item.setForeground(QtGui.QColor("#10b981"))  # Green
-                status_item.setBackground(QtGui.QColor("#ecfdf5"))
-            elif status_text.upper() in ['STOPPED', 'PARKED']:
-                status_item.setForeground(QtGui.QColor("#6b7280"))  # Gray
-            elif status_text.upper() in ['DELAYED', 'WARNING']:
-                status_item.setForeground(QtGui.QColor("#f59e0b"))  # Amber
-                status_item.setBackground(QtGui.QColor("#fffbeb"))
-            elif status_text.upper() in ['ERROR', 'EMERGENCY']:
-                status_item.setForeground(QtGui.QColor("#ef4444"))  # Red
-                status_item.setBackground(QtGui.QColor("#fef2f2"))
+            # Enhanced color coding for various train states
+            if status_text in ['RUNNING', 'MOVING', 'ACTIVE', 'PROCEEDING']:
+                status_item.setForeground(QtGui.QColor("#065f46"))  # Darker green
+                status_item.setBackground(QtGui.QColor("#d1fae5"))  # Soft green
+            elif status_text in ['STOPPED', 'PARKED', 'INACTIVE', 'IDLE']:
+                status_item.setForeground(QtGui.QColor("#374151"))  # Dark gray
+                status_item.setBackground(QtGui.QColor("#f3f4f6"))  # Light gray
+            elif status_text in ['DELAYED', 'WARNING', 'SLOW', 'CAUTION']:
+                status_item.setForeground(QtGui.QColor("#92400e"))  # Darker amber
+                status_item.setBackground(QtGui.QColor("#fef3c7"))  # Soft amber
+            elif status_text in ['ERROR', 'EMERGENCY', 'FAULT', 'CRITICAL']:
+                status_item.setForeground(QtGui.QColor("#991b1b"))  # Darker red
+                status_item.setBackground(QtGui.QColor("#fee2e2"))  # Soft red
+            elif status_text in ['PERSISTENT', 'SCHEDULED', 'WAITING']:
+                status_item.setForeground(QtGui.QColor("#1e3a8a"))  # Blue
+                status_item.setBackground(QtGui.QColor("#dbeafe"))  # Light blue
+            elif status_text in ['DEACTIVATED', 'OUT_OF_SERVICE', 'MAINTENANCE']:
+                status_item.setForeground(QtGui.QColor("#7c2d12"))  # Brown
+                status_item.setBackground(QtGui.QColor("#fef7ed"))  # Light brown
             else:
-                status_item.setForeground(QtGui.QColor("#6b7280"))  # Default gray
+                status_item.setForeground(QtGui.QColor("#374151"))  # Default gray
+                status_item.setBackground(QtGui.QColor("#f3f4f6"))  # Light gray bg
                 
             self.trains_table.setItem(row, 2, status_item)
             
-            # Active status
+            # Enhanced active status with badge styling
             act = tr.get('active')
-            act_text = "Yes" if act else "No"
-            act_item = QtWidgets.QTableWidgetItem(act_text)
-            act_item.font().setBold(True)
+            act_text = "ACTIVE" if act else "INACTIVE"
+            act_item = QtWidgets.QTableWidgetItem(f" {act_text} ")
+            act_font = QtGui.QFont()
+            act_font.setBold(True)
+            act_font.setPixelSize(10)
+            act_item.setFont(act_font)
+            act_item.setTextAlignment(QtCore.Qt.AlignCenter)
             
             if act:
-                act_item.setForeground(QtGui.QColor("#10b981"))  # Green for active
-                act_item.setBackground(QtGui.QColor("#ecfdf5"))
+                act_item.setForeground(QtGui.QColor("#065f46"))  # Darker green for active
+                act_item.setBackground(QtGui.QColor("#d1fae5"))  # Soft green bg
             else:
-                act_item.setForeground(QtGui.QColor("#6b7280"))  # Gray for inactive
+                act_item.setForeground(QtGui.QColor("#374151"))  # Dark gray for inactive
+                act_item.setBackground(QtGui.QColor("#f3f4f6"))  # Light gray bg
                 
             self.trains_table.setItem(row, 3, act_item)
             
