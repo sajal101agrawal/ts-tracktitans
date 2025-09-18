@@ -206,7 +206,7 @@ Examples:
         print("\n🔧 Starting Go server...")
         global server_process
         server_process = subprocess.Popen(
-            ["go", "run", ".", str(simulation_file)],
+            ["go", "run", "main.go", str(simulation_file)],
             cwd=server_dir,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
