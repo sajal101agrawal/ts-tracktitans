@@ -232,7 +232,7 @@ class SidebarNavigation(QtWidgets.QWidget):
         # Define navigation items with proper Qt icons
         nav_items = [
             ("simulation", "Section view", "simulation"),
-            ("map_overview", "Map Overview", "map"),
+            ("map_view", "Map View", "map"),
             ("system_status", "System Status", "status"), 
             ("whatif_analysis", "What-If Analysis", "analysis"),
             ("kpi_dashboard", "KPI Dashboard", "dashboard"),
@@ -776,14 +776,8 @@ class MapOverviewWidget(QtWidgets.QWidget):
             profile = self.railway_map_view.page().profile()
             profile.setHttpUserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
             
-            # Add console message handler
-            def handle_console_message(level, message, line, sourceId):
-                level_str = ["Info", "Warning", "Error"][level]
-                print(f"Railway Map Console [{level_str}]: {message} (line {line}, source: {sourceId})")
-            
-            # Set console message handler
+            # Get page for other handlers
             page = self.railway_map_view.page()
-            page.javaScriptConsoleMessage.connect(handle_console_message)
             
             # Add certificate error handler
             def handle_certificate_error(error):

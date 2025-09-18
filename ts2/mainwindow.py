@@ -488,6 +488,12 @@ class MainWindow(QtWidgets.QMainWindow):
         self.view_index_map["map_overview"] = self.view_stack.count() - 1
         self.views["map_overview"] = self.map_overview
         
+        # Map View - Live Train Tracking
+        self.map_view = analytics_views.MapViewWidget(self)
+        self.view_stack.addWidget(self.map_view)
+        self.view_index_map["map_view"] = self.view_stack.count() - 1
+        self.views["map_view"] = self.map_view
+        
         # Train Management
         self.train_management = sidebar.TrainManagementWidget(self)
         self.view_stack.addWidget(self.train_management)
