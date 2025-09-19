@@ -149,7 +149,11 @@ def install_python_dependencies():
     
     # Required packages for TS2
     required_packages = [
-        'PyQt5>=5.12.0',  # GUI framework (NOT PyQt6!)
+        'PyQt5>=5.15.10,<6.0.0',   # GUI framework (NOT PyQt6!)
+        'PyQt5-Qt5>=5.15.17',
+        'PyQt5-sip>=12.17.0',
+        'PyQtWebEngine>=5.15.7,<6.0.0',
+        'PyQtWebEngine-Qt5>=5.15.17',
         'websocket-client>=1.0.0',  # WebSocket support
         'simplejson>=3.2.0',  # JSON handling
         'PyQtWebEngine>=5.12.0',  # WebEngine support
