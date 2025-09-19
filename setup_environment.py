@@ -152,6 +152,7 @@ def install_python_dependencies():
         'PyQt5>=5.12.0',  # GUI framework (NOT PyQt6!)
         'websocket-client>=1.0.0',  # WebSocket support
         'simplejson>=3.2.0',  # JSON handling
+        'PyQtWebEngine>=5.12.0',  # WebEngine support
         'requests>=2.20.0',  # HTTP requests
     ]
     

@@ -15,3 +15,15 @@ __pycache__/
 *.log   
 *.log.*
 
+
+_build/
+_static/
+_templates/
+_pycache/
+_pycache/
+__pycache__
+_pycache_
+
+
+ts2/_pycache_
+ts2/__pycache__
